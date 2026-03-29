@@ -1,27 +1,25 @@
-# Copyright (c) Meta Platforms, Inc. and affiliates.
-# All rights reserved.
-#
-# This source code is licensed under the BSD-style license found in the
-# LICENSE file in the root directory of this source tree.
-
-"""
-Data models for the Incident Response Triage Env Environment.
-
-The incident_response_triage_env environment is a simple test environment that echoes back messages.
-"""
-
-from openenv.core.env_server.types import Action, Observation
+from openenv.core.env_server.types import Action, Observation, State
 from pydantic import Field
-
+from typing import Literal, Optional
 
 class IncidentResponseTriageAction(Action):
-    """Action for the Incident Response Triage Env environment - just a message to echo."""
-
-    message: str = Field(..., description="Message to echo back")
+    action_type: Literal[
+        "read_logs", "check_metrics", "identify_cause", "propose_fix", "escalate"
+    ]
+    service: Optional[str] = None
+    reasoning: str
+    answer: Optional[str] = None
 
 
 class IncidentResponseTriageObservation(Observation):
-    """Observation from the Incident Response Triage Env environment - the echoed message."""
+    step: int
+    max_steps: int
+    logs: list[dict]
+    metrics: list[dict]
+    alerts: list[dict]
+    previous_actions: list[str] = Field(default_factory=list)
+    task_description: str
+    reward: float = 0.0
+    done: bool = False
+    final_score : Optional[float] = None
 
-    echoed_message: str = Field(default="", description="The echoed message")
-    message_length: int = Field(default=0, description="Length of the echoed message")
