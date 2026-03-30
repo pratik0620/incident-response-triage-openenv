@@ -1,104 +1,139 @@
-# Copyright (c) Meta Platforms, Inc. and affiliates.
-# All rights reserved.
-#
-# This source code is licensed under the BSD-style license found in the
-# LICENSE file in the root directory of this source tree.
-
-"""
-Incident Response Triage Env Environment Implementation.
-
-A simple test environment that echoes back messages sent to it.
-Perfect for testing HTTP server infrastructure.
-"""
-
+from __future__ import annotations
 from uuid import uuid4
+import json
+import os
+import random
+
 
 from openenv.core.env_server.interfaces import Environment
 from openenv.core.env_server.types import State
 
+
 try:
-    from ..models import IncidentResponseTriageAction, IncidentResponseTriageObservation
+    from ..models import IncidentResponseTriageAction, IncidentResponseTriageObservation, IncidentResponseTriageState
 except ImportError:
-    from models import IncidentResponseTriageAction, IncidentResponseTriageObservation
+    from models import IncidentResponseTriageAction, IncidentResponseTriageObservation, IncidentResponseTriageState
+
+from scenarios.schema import Scenario
 
 
 class IncidentResponseTriageEnvironment(Environment):
-    """
-    A simple echo environment that echoes back messages.
-
-    This environment is designed for testing the HTTP server infrastructure.
-    It maintains minimal state and simply echoes back whatever message it receives.
-
-    Example:
-        >>> env = IncidentResponseTriageEnvironment()
-        >>> obs = env.reset()
-        >>> print(obs.echoed_message)  # "Incident Response Triage Env environment ready!"
-        >>>
-        >>> obs = env.step(IncidentResponseTriageAction(message="Hello"))
-        >>> print(obs.echoed_message)  # "Hello"
-        >>> print(obs.message_length)  # 5
-    """
-
-    # Enable concurrent WebSocket sessions.
-    # Set to True if your environment isolates state between instances.
-    # When True, multiple WebSocket clients can connect simultaneously, each
-    # getting their own environment instance (when using factory mode in app.py).
     SUPPORTS_CONCURRENT_SESSIONS: bool = True
+
 
     def __init__(self):
         """Initialize the incident_response_triage_env environment."""
-        self._state = State(episode_id=str(uuid4()), step_count=0)
-        self._reset_count = 0
+        self._state = IncidentResponseTriageState(episode_id=str(uuid4()), step=0)
+        self.scenarios: list[Scenario] = []
+        self.current_scenario: Scenario | None = None
+        self._load_scenarios()
 
-    def reset(self) -> IncidentResponseTriageObservation:
-        """
-        Reset the environment.
 
-        Returns:
-            IncidentResponseTriageObservation with a ready message
-        """
-        self._state = State(episode_id=str(uuid4()), step_count=0)
-        self._reset_count += 1
+    def _load_scenarios(self):
+        base = "scenarios"
 
-        return IncidentResponseTriageObservation(
-            echoed_message="Incident Response Triage Env environment ready!",
-            message_length=0,
+        for difficulty in ["easy", "medium", "hard"]:
+            folder = os.path.join(base, difficulty)
+
+            if not os.path.exists(folder):
+                continue
+
+            for file in os.listdir(folder):
+                if file.endswith(".json"):
+                    path = os.path.join(folder, file)
+                    with open(path) as f:
+                        data = json.load(f)
+                        self.scenarios.append(Scenario(**data))
+
+
+    def reset(self, difficulty: str = "easy") -> IncidentResponseTriageObservation:
+        filtered = [s for s in self.scenarios if s.difficulty == difficulty]
+
+        if not filtered:
+            filtered = self.scenarios
+
+        if not filtered:
+            raise ValueError("No scenarios found. Check your scenarios folder.")
+
+        self.current_scenario = random.choice(filtered)
+
+        self._state = IncidentResponseTriageState(
+            episode_id=str(uuid4()),
+            step=0,
+            max_steps=self.current_scenario.max_steps,
+            previous_actions=[],
             done=False,
-            reward=0.0,
         )
+
+        return self._build_observation(reward=0.0, done=False)
+
 
     def step(self, action: IncidentResponseTriageAction) -> IncidentResponseTriageObservation:  # type: ignore[override]
-        """
-        Execute a step in the environment by echoing the message.
+        if self._state.done:
+            return self._build_observation(reward=0.0, done=True, msg="Episode ended.")
 
-        Args:
-            action: IncidentResponseTriageAction containing the message to echo
+        action_type = (action.action_type or "").strip().lower()
 
-        Returns:
-            IncidentResponseTriageObservation with the echoed message and its length
-        """
-        self._state.step_count += 1
+        self._state.step += 1
+        self._state.previous_actions.append(action_type)
 
-        message = action.message
-        length = len(message)
+        if action_type in ["identify_cause", "propose_fix", "escalate"]:
+            return self._handle_terminal(action_type, action)
 
-        # Simple reward: longer messages get higher rewards
-        reward = length * 0.1
+        reward = -0.02
+
+        if self._state.step >= self._state.max_steps:
+            return self._force_end()
+
+        return self._build_observation(reward=reward, done=False)
+
+
+    def _handle_terminal(self, action_type: str, action):
+        """Temporary function until graders are implemented"""
+
+        if action_type == "escalate":
+            score = 0.2
+        else:
+            score = 0.5
+
+        self._state.done = True
+        self._state.final_score = score
+
+        return self._build_observation(
+            reward=score,
+            done=True,
+            final_score=score,
+        )
+
+
+    def _force_end(self):
+        self._state.done = True
+        return self._build_observation(
+            reward=0.0,
+            done=True,
+            msg="Max steps crossed. Episode ended."
+        )
+
+
+    def _build_observation(self, reward, done, msg=None, final_score=None):
+        if not self.current_scenario:
+            raise ValueError("Call reset() before step().")
+        scenario = self.current_scenario
 
         return IncidentResponseTriageObservation(
-            echoed_message=message,
-            message_length=length,
-            done=False,
+            step=self._state.step,
+            max_steps=scenario.max_steps,
+            logs=scenario.logs,
+            metrics=scenario.metrics,
+            alerts=scenario.alerts,
+            previous_actions=self._state.previous_actions,
+            task_description=scenario.description,
             reward=reward,
-            metadata={"original_message": message, "step": self._state.step_count},
+            done=done,
+            final_score=final_score,
         )
+
 
     @property
     def state(self) -> State:
-        """
-        Get the current environment state.
-
-        Returns:
-            Current State with episode_id and step_count
-        """
         return self._state

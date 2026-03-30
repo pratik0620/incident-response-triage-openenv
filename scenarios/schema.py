@@ -15,7 +15,7 @@ class MetricSnapshot(BaseModel):
   latency_p99_ms: float
 
 class Alert(BaseModel):
-  action_id: str
+  alert_id: str
   service: str
   severity: Literal["P1", "P2", "P3", "P4"]
   message: str
@@ -31,7 +31,7 @@ class GroundTruth(BaseModel):
 
 class Scenario(BaseModel):
   scenario_id: str
-  difficult: Literal["easy", "medium", "hard"]
+  difficulty: Literal["easy", "medium", "hard"]
   title: str
   description: str
   logs: list[LogEntry]
