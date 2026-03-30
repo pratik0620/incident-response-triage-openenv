@@ -1,0 +1,66 @@
+{
+  "scenario_id": "scenario_002",
+  "difficulty": "easy",
+  "title": "Intermittent checkout failures",
+  "description": "A subset of checkout calls fail while auth and gateway look mostly healthy.",
+  "logs": [
+    {
+      "timestamp": "2026-03-30T11:02:10Z",
+      "service": "api-gateway",
+      "message": "Intermittent 5xx responses observed on /charge during checkout bursts",
+      "level": "ERROR"
+    },
+    {
+      "timestamp": "2026-03-30T11:02:12Z",
+      "service": "payment-service",
+      "message": "Backend session initialization repeatedly timing out during request spikes",
+      "level": "ERROR"
+    },
+    {
+      "timestamp": "2026-03-30T11:02:13Z",
+      "service": "payment-service",
+      "message": "Retry budget exceeded after multiple transient transaction failures",
+      "level": "WARN"
+    },
+    {
+      "timestamp": "2026-03-30T11:02:15Z",
+      "service": "auth-service",
+      "message": "JWT issuer lookup cache hit",
+      "level": "DEBUG"
+    }
+  ],
+  "metrics": [
+    {
+      "service": "payment-service",
+      "cpu_pct": 63.3,
+      "mem_pct": 69.2,
+      "error_rate": 0.22,
+      "latency_p99_ms": 3900.0
+    },
+    {
+      "service": "auth-service",
+      "cpu_pct": 27.1,
+      "mem_pct": 40.5,
+      "error_rate": 0.01,
+      "latency_p99_ms": 130.0
+    }
+  ],
+  "alerts": [
+    {
+      "alert_id": "A-2001",
+      "service": "payment-service",
+      "severity": "P1",
+      "message": "Checkout failure and timeout pattern above incident threshold",
+      "fired_at": "2026-03-30T11:02:16Z"
+    }
+  ],
+  "ground_truth": {
+    "root_cause_service": "payment-service",
+    "root_cause_type": "db_connection_pool_exhaustion",
+    "correct_fix": "kubectl rollout restart deploy/payment-service",
+    "failure_category": "real",
+    "severity": "P1",
+    "red_herrings": []
+  },
+  "max_steps": 5
+}

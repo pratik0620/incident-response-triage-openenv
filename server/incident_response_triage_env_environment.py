@@ -137,3 +137,42 @@ class IncidentResponseTriageEnvironment(Environment):
     @property
     def state(self) -> State:
         return self._state
+
+
+if __name__ == "__main__":
+    env = IncidentResponseTriageEnvironment()
+
+    # reset() returns the initial observation.
+    observation = env.reset()
+    print(
+        "reset -> "
+        f"logs={len(observation.logs)}, metrics={len(observation.metrics)}, alerts={len(observation.alerts)}"
+    )
+
+    # Make the test deterministic for the hardcoded correct action below.
+    env.current_scenario = load_scenario("scenario_001")
+
+    correct_action = IncidentResponseTriageAction(
+        root_cause_service="payment-service",
+        root_cause_type="db_connection_pool_exhaustion",
+        fix_command="kubectl rollout restart deploy/payment-service",
+        confidence=0.95,
+    )
+    # step() follows Gym-style return format: (observation, reward, done, info).
+    observation, reward, done, info = env.step(correct_action)
+    print(f"correct action reward={reward}, done={done}, breakdown={info['breakdown']}")
+    assert reward >= 1
+
+    observation = env.reset()
+    env.current_scenario = load_scenario("scenario_001")
+
+    incorrect_action = IncidentResponseTriageAction(
+        root_cause_service="auth-service",
+        root_cause_type="token_issuer_outage",
+        fix_command="kubectl rollout restart deploy/auth-service",
+        confidence=0.15,
+    )
+    # Unpack tuple outputs instead of using attribute access on a result object.
+    observation, reward, done, info = env.step(incorrect_action)
+    print(f"incorrect action reward={reward}, done={done}, breakdown={info['breakdown']}")
+    assert reward == -3

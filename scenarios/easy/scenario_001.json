@@ -1,0 +1,73 @@
+{
+  "scenario_id": "scenario_001",
+  "difficulty": "easy",
+  "title": "Payment API timeout spike",
+  "description": "Checkout requests are timing out due to upstream failures in the payment-service.",
+  "logs": [
+    {
+      "timestamp": "2026-03-30T09:15:01Z",
+      "service": "api-gateway",
+      "message": "POST /checkout requests are breaching upstream timeout thresholds during peak traffic",
+      "level": "ERROR"
+    },
+    {
+      "timestamp": "2026-03-30T09:15:03Z",
+      "service": "payment-service",
+      "message": "Frequent timeout errors observed while requesting backend data resources",
+      "level": "ERROR"
+    },
+    {
+      "timestamp": "2026-03-30T09:15:05Z",
+      "service": "payment-service",
+      "message": "Request processing stalled under load with sustained retry pressure",
+      "level": "FATAL"
+    },
+    {
+      "timestamp": "2026-03-30T09:15:06Z",
+      "service": "auth-service",
+      "message": "Token validation latency nominal",
+      "level": "INFO"
+    }
+  ],
+  "metrics": [
+    {
+      "service": "payment-service",
+      "cpu_pct": 68.4,
+      "mem_pct": 72.1,
+      "error_rate": 0.27,
+      "latency_p99_ms": 4200.0
+    },
+    {
+      "service": "api-gateway",
+      "cpu_pct": 41.8,
+      "mem_pct": 56.7,
+      "error_rate": 0.12,
+      "latency_p99_ms": 1850.0
+    }
+  ],
+  "alerts": [
+    {
+      "alert_id": "A-1001",
+      "service": "payment-service",
+      "severity": "P1",
+      "message": "Sustained transaction failures and timeout symptoms detected for 5m",
+      "fired_at": "2026-03-30T09:15:07Z"
+    },
+    {
+      "alert_id": "A-1002",
+      "service": "api-gateway",
+      "severity": "P2",
+      "message": "P99 request latency persistently above service objective",
+      "fired_at": "2026-03-30T09:15:07Z"
+    }
+  ],
+  "ground_truth": {
+    "root_cause_service": "payment-service",
+    "root_cause_type": "db_connection_pool_exhaustion",
+    "correct_fix": "kubectl rollout restart deploy/payment-service",
+    "failure_category": "real",
+    "severity": "P1",
+    "red_herrings": []
+  },
+  "max_steps": 5
+}
