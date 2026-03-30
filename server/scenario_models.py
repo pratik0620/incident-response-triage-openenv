@@ -19,7 +19,8 @@ class MetricSnapshot(BaseModel):
 
 
 class Alert(BaseModel):
-    action_id: str
+    # Renamed from action_id to better represent incoming alert identifiers.
+    alert_id: str
     service: str
     severity: Literal["P1", "P2", "P3", "P4"]
     message: str
@@ -37,7 +38,8 @@ class GroundTruth(BaseModel):
 
 class Scenario(BaseModel):
     scenario_id: str
-    difficult: Literal["easy", "medium", "hard"]
+    # Renamed from difficult to difficulty for schema clarity.
+    difficulty: Literal["easy", "medium", "hard"]
     title: str
     description: str
     logs: list[LogEntry]

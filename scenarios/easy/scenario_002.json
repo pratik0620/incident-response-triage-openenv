@@ -1,25 +1,25 @@
 {
   "scenario_id": "scenario_002",
-  "difficult": "easy",
+  "difficulty": "easy",
   "title": "Intermittent checkout failures",
   "description": "A subset of checkout calls fail while auth and gateway look mostly healthy.",
   "logs": [
     {
       "timestamp": "2026-03-30T11:02:10Z",
       "service": "api-gateway",
-      "message": "502 from payment-service on /charge",
+      "message": "Intermittent 5xx responses observed on /charge during checkout bursts",
       "level": "ERROR"
     },
     {
       "timestamp": "2026-03-30T11:02:12Z",
       "service": "payment-service",
-      "message": "Cannot open new DB session: pool timeout",
+      "message": "Backend session initialization repeatedly timing out during request spikes",
       "level": "ERROR"
     },
     {
       "timestamp": "2026-03-30T11:02:13Z",
       "service": "payment-service",
-      "message": "Retry budget exceeded for database transaction",
+      "message": "Retry budget exceeded after multiple transient transaction failures",
       "level": "WARN"
     },
     {
@@ -47,10 +47,10 @@
   ],
   "alerts": [
     {
-      "action_id": "A-2001",
+      "alert_id": "A-2001",
       "service": "payment-service",
       "severity": "P1",
-      "message": "Checkout failure rate above threshold",
+      "message": "Checkout failure and timeout pattern above incident threshold",
       "fired_at": "2026-03-30T11:02:16Z"
     }
   ],
@@ -62,5 +62,5 @@
     "severity": "P1",
     "red_herrings": []
   },
-  "max_steps": 4
+  "max_steps": 5
 }

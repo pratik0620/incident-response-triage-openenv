@@ -1,0 +1,62 @@
+{
+  "scenario_id": "scenario_004",
+  "difficulty": "easy",
+  "title": "Notification queue backlog",
+  "description": "Email notifications are delayed because workers are throttled by an outdated config.",
+  "logs": [
+    {
+      "timestamp": "2026-03-30T14:11:09Z",
+      "service": "notification-worker",
+      "message": "Worker throughput is significantly lower than expected under normal queue load",
+      "level": "WARN"
+    },
+    {
+      "timestamp": "2026-03-30T14:11:10Z",
+      "service": "notification-worker",
+      "message": "Pending notification backlog growing rapidly with delayed drain times",
+      "level": "ERROR"
+    },
+    {
+      "timestamp": "2026-03-30T14:11:12Z",
+      "service": "api-gateway",
+      "message": "POST /notify accepted requests normally",
+      "level": "INFO"
+    }
+  ],
+  "metrics": [
+    {
+      "service": "notification-worker",
+      "cpu_pct": 34.8,
+      "mem_pct": 52.0,
+      "error_rate": 0.08,
+      "latency_p99_ms": 980.0
+    },
+    {
+      "service": "queue-service",
+      "cpu_pct": 22.4,
+      "mem_pct": 61.3,
+      "error_rate": 0.01,
+      "latency_p99_ms": 120.0
+    }
+  ],
+  "alerts": [
+    {
+      "alert_id": "A-4001",
+      "service": "notification-worker",
+      "severity": "P3",
+      "message": "Queue drain rate degraded and backlog remained above threshold",
+      "fired_at": "2026-03-30T14:11:13Z"
+    }
+  ],
+  "ground_truth": {
+    "root_cause_service": "notification-worker",
+    "root_cause_type": "worker_rate_limit_misconfiguration",
+    "correct_fix": "kubectl set env deploy/notification-worker WORKER_RATE_LIMIT=50",
+    "failure_category": "env_specific",
+    "severity": "P3",
+    "red_herrings": [
+      "queue-service"
+    ]
+  },
+  "max_steps": 5
+}

@@ -5,10 +5,13 @@ from pathlib import Path
 from .scenario_models import Scenario
 
 
+# Scenarios are now organized by difficulty under scenarios/easy.
+SCENARIOS_EASY_DIR = Path(__file__).resolve().parents[1] / "scenarios" / "easy"
+
+
 def load_scenario(scenario_id: str) -> Scenario:
-    """Load a scenario by ID from the repository scenarios directory."""
-    scenarios_dir = Path(__file__).resolve().parents[1] / "scenarios"
-    scenario_path = scenarios_dir / f"{scenario_id}.json"
+    """Load a scenario by ID from the easy scenarios directory."""
+    scenario_path = SCENARIOS_EASY_DIR / f"{scenario_id}.json"
 
     if not scenario_path.exists():
         raise FileNotFoundError(f"Scenario file not found: {scenario_path}")
@@ -20,13 +23,14 @@ def load_scenario(scenario_id: str) -> Scenario:
 
 
 def get_all_scenarios() -> list[Scenario]:
-    """Load and return all Scenario objects from the scenarios directory."""
-    scenarios_dir = Path(__file__).resolve().parents[1] / "scenarios"
+    """Load and return all Scenario objects from scenarios/easy."""
 
     # Find every JSON scenario file in a deterministic order.
-    scenario_files = sorted(scenarios_dir.glob("*.json"))
+    scenario_files = sorted(SCENARIOS_EASY_DIR.glob("*.json"))
     if not scenario_files:
-        raise FileNotFoundError(f"No scenario JSON files found in: {scenarios_dir}")
+        raise FileNotFoundError(
+            f"No scenario JSON files found in: {SCENARIOS_EASY_DIR}"
+        )
 
     scenarios: list[Scenario] = []
     for scenario_file in scenario_files:
@@ -42,7 +46,7 @@ def filter_scenarios_by_difficulty(
     scenarios: list[Scenario], difficulty: str
 ) -> list[Scenario]:
     """Return only scenarios that match the requested difficulty level."""
-    return [scenario for scenario in scenarios if scenario.difficult == difficulty]
+    return [scenario for scenario in scenarios if scenario.difficulty == difficulty]
 
 
 def load_random_scenario(difficulty: str = "easy") -> Scenario:

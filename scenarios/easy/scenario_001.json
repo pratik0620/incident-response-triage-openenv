@@ -1,25 +1,25 @@
 {
   "scenario_id": "scenario_001",
-  "difficult": "easy",
+  "difficulty": "easy",
   "title": "Payment API timeout spike",
   "description": "Checkout requests are timing out due to upstream failures in the payment-service.",
   "logs": [
     {
       "timestamp": "2026-03-30T09:15:01Z",
       "service": "api-gateway",
-      "message": "POST /checkout exceeded upstream timeout for payment-service",
+      "message": "POST /checkout requests are breaching upstream timeout thresholds during peak traffic",
       "level": "ERROR"
     },
     {
       "timestamp": "2026-03-30T09:15:03Z",
       "service": "payment-service",
-      "message": "Acquire DB connection timed out after 5000ms",
+      "message": "Frequent timeout errors observed while requesting backend data resources",
       "level": "ERROR"
     },
     {
       "timestamp": "2026-03-30T09:15:05Z",
       "service": "payment-service",
-      "message": "Connection pool exhausted (active=100, idle=0)",
+      "message": "Request processing stalled under load with sustained retry pressure",
       "level": "FATAL"
     },
     {
@@ -47,17 +47,17 @@
   ],
   "alerts": [
     {
-      "action_id": "A-1001",
+      "alert_id": "A-1001",
       "service": "payment-service",
       "severity": "P1",
-      "message": "Error rate > 20% for 5m",
+      "message": "Sustained transaction failures and timeout symptoms detected for 5m",
       "fired_at": "2026-03-30T09:15:07Z"
     },
     {
-      "action_id": "A-1002",
+      "alert_id": "A-1002",
       "service": "api-gateway",
       "severity": "P2",
-      "message": "P99 latency above SLO",
+      "message": "P99 request latency persistently above service objective",
       "fired_at": "2026-03-30T09:15:07Z"
     }
   ],
@@ -69,5 +69,5 @@
     "severity": "P1",
     "red_herrings": []
   },
-  "max_steps": 3
+  "max_steps": 5
 }

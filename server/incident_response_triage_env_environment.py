@@ -1,4 +1,3 @@
-from random import choice
 from uuid import uuid4
 
 from openenv.core.env_server.interfaces import Environment
@@ -6,11 +5,11 @@ from openenv.core.env_server.types import State
 
 try:
     from ..models import IncidentResponseTriageAction, IncidentResponseTriageObservation
-    from .scenario_loader import load_scenario
+    from .scenario_loader import load_random_scenario, load_scenario
     from .scenario_models import Scenario
 except ImportError:
     from models import IncidentResponseTriageAction, IncidentResponseTriageObservation
-    from server.scenario_loader import load_scenario
+    from server.scenario_loader import load_random_scenario, load_scenario
     from server.scenario_models import Scenario
 
 
@@ -31,8 +30,8 @@ class IncidentResponseTriageEnvironment(Environment):
         self.step_count = 0
         self._last_reward = 0.0
 
-        scenario_id = choice(["scenario_001", "scenario_002"])
-        self.current_scenario = load_scenario(scenario_id)
+        # Keep reset selection random while delegating to the centralized loader.
+        self.current_scenario = load_random_scenario("easy")
 
         return IncidentResponseTriageObservation(
             logs=self.current_scenario.logs,
@@ -43,7 +42,7 @@ class IncidentResponseTriageEnvironment(Environment):
             reward=0.0,
             metadata={
                 "scenario_id": self.current_scenario.scenario_id,
-                "difficulty": self.current_scenario.difficult,
+                "difficulty": self.current_scenario.difficulty,
             },
         )
 
