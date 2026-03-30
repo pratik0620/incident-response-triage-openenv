@@ -1,0 +1,66 @@
+{
+  "scenario_id": "scenario_002",
+  "difficult": "easy",
+  "title": "Intermittent checkout failures",
+  "description": "A subset of checkout calls fail while auth and gateway look mostly healthy.",
+  "logs": [
+    {
+      "timestamp": "2026-03-30T11:02:10Z",
+      "service": "api-gateway",
+      "message": "502 from payment-service on /charge",
+      "level": "ERROR"
+    },
+    {
+      "timestamp": "2026-03-30T11:02:12Z",
+      "service": "payment-service",
+      "message": "Cannot open new DB session: pool timeout",
+      "level": "ERROR"
+    },
+    {
+      "timestamp": "2026-03-30T11:02:13Z",
+      "service": "payment-service",
+      "message": "Retry budget exceeded for database transaction",
+      "level": "WARN"
+    },
+    {
+      "timestamp": "2026-03-30T11:02:15Z",
+      "service": "auth-service",
+      "message": "JWT issuer lookup cache hit",
+      "level": "DEBUG"
+    }
+  ],
+  "metrics": [
+    {
+      "service": "payment-service",
+      "cpu_pct": 63.3,
+      "mem_pct": 69.2,
+      "error_rate": 0.22,
+      "latency_p99_ms": 3900.0
+    },
+    {
+      "service": "auth-service",
+      "cpu_pct": 27.1,
+      "mem_pct": 40.5,
+      "error_rate": 0.01,
+      "latency_p99_ms": 130.0
+    }
+  ],
+  "alerts": [
+    {
+      "action_id": "A-2001",
+      "service": "payment-service",
+      "severity": "P1",
+      "message": "Checkout failure rate above threshold",
+      "fired_at": "2026-03-30T11:02:16Z"
+    }
+  ],
+  "ground_truth": {
+    "root_cause_service": "payment-service",
+    "root_cause_type": "db_connection_pool_exhaustion",
+    "correct_fix": "kubectl rollout restart deploy/payment-service",
+    "failure_category": "real",
+    "severity": "P1",
+    "red_herrings": []
+  },
+  "max_steps": 4
+}

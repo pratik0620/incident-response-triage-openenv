@@ -29,17 +29,31 @@ class IncidentResponseTriageEnv(
         >>> # Connect to a running server
         >>> with IncidentResponseTriageEnv(base_url="http://localhost:8000") as client:
         ...     result = client.reset()
-        ...     print(result.observation.echoed_message)
+        ...     print(result.observation.step_count)
         ...
-        ...     result = client.step(IncidentResponseTriageAction(message="Hello!"))
-        ...     print(result.observation.echoed_message)
+        ...     result = client.step(
+        ...         IncidentResponseTriageAction(
+        ...             root_cause_service="payment-service",
+        ...             root_cause_type="db_connection_pool_exhaustion",
+        ...             fix_command="kubectl rollout restart deploy/payment-service",
+        ...             confidence=0.9,
+        ...         )
+        ...     )
+        ...     print(result.reward)
 
     Example with Docker:
         >>> # Automatically start container and connect
         >>> client = IncidentResponseTriageEnv.from_docker_image("incident_response_triage_env-env:latest")
         >>> try:
         ...     result = client.reset()
-        ...     result = client.step(IncidentResponseTriageAction(message="Test"))
+        ...     result = client.step(
+        ...         IncidentResponseTriageAction(
+        ...             root_cause_service="payment-service",
+        ...             root_cause_type="db_connection_pool_exhaustion",
+        ...             fix_command="kubectl rollout restart deploy/payment-service",
+        ...             confidence=0.8,
+        ...         )
+        ...     )
         ... finally:
         ...     client.close()
     """
@@ -55,7 +69,10 @@ class IncidentResponseTriageEnv(
             Dictionary representation suitable for JSON encoding
         """
         return {
-            "message": action.message,
+            "root_cause_service": action.root_cause_service,
+            "root_cause_type": action.root_cause_type,
+            "fix_command": action.fix_command,
+            "confidence": action.confidence,
         }
 
     def _parse_result(self, payload: Dict) -> StepResult[IncidentResponseTriageObservation]:
@@ -70,10 +87,12 @@ class IncidentResponseTriageEnv(
         """
         obs_data = payload.get("observation", {})
         observation = IncidentResponseTriageObservation(
-            echoed_message=obs_data.get("echoed_message", ""),
-            message_length=obs_data.get("message_length", 0),
+            logs=obs_data.get("logs", []),
+            metrics=obs_data.get("metrics", []),
+            alerts=obs_data.get("alerts", []),
+            step_count=obs_data.get("step_count", 0),
             done=payload.get("done", False),
-            reward=payload.get("reward"),
+            reward=payload.get("reward", 0.0),
             metadata=obs_data.get("metadata", {}),
         )
 

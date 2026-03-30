@@ -7,21 +7,38 @@
 """
 Data models for the Incident Response Triage Env Environment.
 
-The incident_response_triage_env environment is a simple test environment that echoes back messages.
+These models define the action and observation payloads used by the environment.
 """
+
+from typing import Any
 
 from openenv.core.env_server.types import Action, Observation
 from pydantic import Field
 
+try:
+    from .server.scenario_models import Alert, LogEntry, MetricSnapshot
+except ImportError:
+    from server.scenario_models import Alert, LogEntry, MetricSnapshot
+
 
 class IncidentResponseTriageAction(Action):
-    """Action for the Incident Response Triage Env environment - just a message to echo."""
+    """Action payload submitted by an agent to triage an incident."""
 
-    message: str = Field(..., description="Message to echo back")
+    root_cause_service: str = Field(..., description="Predicted root-cause service")
+    root_cause_type: str = Field(..., description="Predicted root-cause type")
+    fix_command: str = Field(..., description="Proposed remediation command")
+    confidence: float = Field(
+        ..., ge=0.0, le=1.0, description="Agent confidence in the triage decision"
+    )
 
 
 class IncidentResponseTriageObservation(Observation):
-    """Observation from the Incident Response Triage Env environment - the echoed message."""
+    """Observation payload returned by the incident response triage environment."""
 
-    echoed_message: str = Field(default="", description="The echoed message")
-    message_length: int = Field(default=0, description="Length of the echoed message")
+    logs: list[LogEntry] = Field(default_factory=list)
+    metrics: list[MetricSnapshot] = Field(default_factory=list)
+    alerts: list[Alert] = Field(default_factory=list)
+    step_count: int = Field(default=0)
+    done: bool = Field(default=False)
+    reward: float = Field(default=0.0)
+    metadata: dict[str, Any] = Field(default_factory=dict)

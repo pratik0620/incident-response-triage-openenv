@@ -1,0 +1,73 @@
+{
+  "scenario_id": "scenario_001",
+  "difficult": "easy",
+  "title": "Payment API timeout spike",
+  "description": "Checkout requests are timing out due to upstream failures in the payment-service.",
+  "logs": [
+    {
+      "timestamp": "2026-03-30T09:15:01Z",
+      "service": "api-gateway",
+      "message": "POST /checkout exceeded upstream timeout for payment-service",
+      "level": "ERROR"
+    },
+    {
+      "timestamp": "2026-03-30T09:15:03Z",
+      "service": "payment-service",
+      "message": "Acquire DB connection timed out after 5000ms",
+      "level": "ERROR"
+    },
+    {
+      "timestamp": "2026-03-30T09:15:05Z",
+      "service": "payment-service",
+      "message": "Connection pool exhausted (active=100, idle=0)",
+      "level": "FATAL"
+    },
+    {
+      "timestamp": "2026-03-30T09:15:06Z",
+      "service": "auth-service",
+      "message": "Token validation latency nominal",
+      "level": "INFO"
+    }
+  ],
+  "metrics": [
+    {
+      "service": "payment-service",
+      "cpu_pct": 68.4,
+      "mem_pct": 72.1,
+      "error_rate": 0.27,
+      "latency_p99_ms": 4200.0
+    },
+    {
+      "service": "api-gateway",
+      "cpu_pct": 41.8,
+      "mem_pct": 56.7,
+      "error_rate": 0.12,
+      "latency_p99_ms": 1850.0
+    }
+  ],
+  "alerts": [
+    {
+      "action_id": "A-1001",
+      "service": "payment-service",
+      "severity": "P1",
+      "message": "Error rate > 20% for 5m",
+      "fired_at": "2026-03-30T09:15:07Z"
+    },
+    {
+      "action_id": "A-1002",
+      "service": "api-gateway",
+      "severity": "P2",
+      "message": "P99 latency above SLO",
+      "fired_at": "2026-03-30T09:15:07Z"
+    }
+  ],
+  "ground_truth": {
+    "root_cause_service": "payment-service",
+    "root_cause_type": "db_connection_pool_exhaustion",
+    "correct_fix": "kubectl rollout restart deploy/payment-service",
+    "failure_category": "real",
+    "severity": "P1",
+    "red_herrings": []
+  },
+  "max_steps": 3
+}

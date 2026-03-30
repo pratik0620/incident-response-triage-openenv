@@ -1,0 +1,2 @@
+[console_scripts]
+server = incident_response_triage_env.server.app:main
