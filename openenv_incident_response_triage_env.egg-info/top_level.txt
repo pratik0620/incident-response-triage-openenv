@@ -1,1 +1,0 @@
-incident_response_triage_env
