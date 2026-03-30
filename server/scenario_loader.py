@@ -2,7 +2,7 @@ import json
 from random import choice
 from pathlib import Path
 
-from .scenario_models import Scenario
+from scenarios.schema import Scenario
 
 
 # Scenarios are now organized by difficulty under scenarios/easy.
