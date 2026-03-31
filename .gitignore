@@ -10,5 +10,19 @@ venv/
 __pycache__/
 *.pyc
 
+# Test and build artifacts
+.pytest_cache/
+.ruff_cache/
+.mypy_cache/
+.coverage
+htmlcov/
+build/
+dist/
+*.egg-info/
+
+# OS files
+.DS_Store
+Thumbs.db
+
 # Environment variables
 .env
