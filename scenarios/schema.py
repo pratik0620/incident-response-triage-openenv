@@ -25,7 +25,7 @@ class GroundTruth(BaseModel):
   root_cause_service: str
   root_cause_type: str
   correct_fix: str
-  failure_category: Literal["real", "intermittent", "env_specific"]
+  failure_category: Literal["real", "flaky", "intermittent", "env_specific"]
   severity: Literal["P1", "P2", "P3", "P4"]
   red_herrings: list[str]
 

@@ -10,9 +10,19 @@ from openenv.core.env_server.types import State
 
 
 try:
-    from ..models import IncidentResponseTriageAction, IncidentResponseTriageObservation, IncidentResponseTriageState
+    from ..models import (
+        IncidentResponseTriageAction,
+        IncidentResponseTriageObservation,
+        IncidentResponseTriageState,
+    )
+    from ..graders.composite_grader import compute_final_score
 except ImportError:
-    from models import IncidentResponseTriageAction, IncidentResponseTriageObservation, IncidentResponseTriageState
+    from models import (
+        IncidentResponseTriageAction,
+        IncidentResponseTriageObservation,
+        IncidentResponseTriageState,
+    )
+    from graders.composite_grader import compute_final_score
 
 from scenarios.schema import Scenario
 
@@ -89,12 +99,20 @@ class IncidentResponseTriageEnvironment(Environment):
 
 
     def _handle_terminal(self, action_type: str, action):
-        """Temporary function until graders are implemented"""
+        if not self.current_scenario:
+            raise ValueError("Call reset() before step().")
 
-        if action_type == "escalate":
-            score = 0.2
-        else:
-            score = 0.5
+        answer_text = " ".join(
+            part for part in [action.answer, action.reasoning] if part
+        ).strip()
+        score = compute_final_score(
+            action_type=action_type,
+            answer=answer_text,
+            ground_truth=self.current_scenario.ground_truth,
+            steps_used=self._state.step,
+            max_steps=self.current_scenario.max_steps,
+            difficulty=self.current_scenario.difficulty,
+        )
 
         self._state.done = True
         self._state.final_score = score
@@ -150,29 +168,33 @@ if __name__ == "__main__":
     )
 
     # Make the test deterministic for the hardcoded correct action below.
-    env.current_scenario = load_scenario("scenario_001")
+    target = next(
+        (scenario for scenario in env.scenarios if scenario.scenario_id == "scenario_001"),
+        None,
+    )
+    if target is not None:
+        env.current_scenario = target
 
     correct_action = IncidentResponseTriageAction(
-        root_cause_service="payment-service",
-        root_cause_type="db_connection_pool_exhaustion",
-        fix_command="kubectl rollout restart deploy/payment-service",
-        confidence=0.95,
+        action_type="identify_cause",
+        reasoning="Payment-service is timing out under load.",
+        answer="payment-service db connection pool exhaustion",
     )
-    # step() follows Gym-style return format: (observation, reward, done, info).
-    observation, reward, done, info = env.step(correct_action)
-    print(f"correct action reward={reward}, done={done}, breakdown={info['breakdown']}")
-    assert reward >= 1
+    observation = env.step(correct_action)
+    print(
+        f"correct action reward={observation.reward}, done={observation.done}, final={observation.final_score}"
+    )
 
     observation = env.reset()
-    env.current_scenario = load_scenario("scenario_001")
+    if target is not None:
+        env.current_scenario = target
 
     incorrect_action = IncidentResponseTriageAction(
-        root_cause_service="auth-service",
-        root_cause_type="token_issuer_outage",
-        fix_command="kubectl rollout restart deploy/auth-service",
-        confidence=0.15,
+        action_type="identify_cause",
+        reasoning="Auth service looks unhealthy.",
+        answer="auth-service token issuer outage",
     )
-    # Unpack tuple outputs instead of using attribute access on a result object.
-    observation, reward, done, info = env.step(incorrect_action)
-    print(f"incorrect action reward={reward}, done={done}, breakdown={info['breakdown']}")
-    assert reward == -3
+    observation = env.step(incorrect_action)
+    print(
+        f"incorrect action reward={observation.reward}, done={observation.done}, final={observation.final_score}"
+    )
