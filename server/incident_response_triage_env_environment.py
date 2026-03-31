@@ -15,7 +15,7 @@ except ImportError:
     from models import IncidentResponseTriageAction, IncidentResponseTriageObservation, IncidentResponseTriageState
 
 from scenarios.schema import Scenario
-
+from server.scenario_loader import load_random_scenario
 
 class IncidentResponseTriageEnvironment(Environment):
     SUPPORTS_CONCURRENT_SESSIONS: bool = True
@@ -26,36 +26,10 @@ class IncidentResponseTriageEnvironment(Environment):
         self._state = IncidentResponseTriageState(episode_id=str(uuid4()), step=0)
         self.scenarios: list[Scenario] = []
         self.current_scenario: Scenario | None = None
-        self._load_scenarios()
-
-
-    def _load_scenarios(self):
-        base = "scenarios"
-
-        for difficulty in ["easy", "medium", "hard"]:
-            folder = os.path.join(base, difficulty)
-
-            if not os.path.exists(folder):
-                continue
-
-            for file in os.listdir(folder):
-                if file.endswith(".json"):
-                    path = os.path.join(folder, file)
-                    with open(path) as f:
-                        data = json.load(f)
-                        self.scenarios.append(Scenario(**data))
 
 
     def reset(self, difficulty: str = "easy") -> IncidentResponseTriageObservation:
-        filtered = [s for s in self.scenarios if s.difficulty == difficulty]
-
-        if not filtered:
-            filtered = self.scenarios
-
-        if not filtered:
-            raise ValueError("No scenarios found. Check your scenarios folder.")
-
-        self.current_scenario = random.choice(filtered)
+        self.current_scenario = load_random_scenario(difficulty)
 
         self._state = IncidentResponseTriageState(
             episode_id=str(uuid4()),

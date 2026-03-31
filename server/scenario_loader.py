@@ -6,38 +6,36 @@ from scenarios.schema import Scenario
 
 
 # Scenarios are now organized by difficulty under scenarios/easy.
-SCENARIOS_EASY_DIR = Path(__file__).resolve().parents[1] / "scenarios" / "easy"
+SCENARIOS_BASE_DIR = Path(__file__).resolve().parents[1] / "scenarios"
 
 
 def load_scenario(scenario_id: str) -> Scenario:
-    """Load a scenario by ID from the easy scenarios directory."""
-    scenario_path = SCENARIOS_EASY_DIR / f"{scenario_id}.json"
+    """Load a scenario by ID from scenarios/{difficulty}/ directories."""
+    for difficulty in ["easy", "medium", "hard"]:
+        scenario_path = SCENARIOS_BASE_DIR / difficulty / f"{scenario_id}.json"
 
-    if not scenario_path.exists():
-        raise FileNotFoundError(f"Scenario file not found: {scenario_path}")
+        if scenario_path.exists():
+            with scenario_path.open("r", encoding="utf-8") as f:
+                payload = json.load(f)
+            return Scenario.model_validate(payload)
 
-    with scenario_path.open("r", encoding="utf-8") as f:
-        payload = json.load(f)
-
-    return Scenario.model_validate(payload)
+    raise FileNotFoundError(f"Scenario not found: {scenario_id}")
 
 
 def get_all_scenarios() -> list[Scenario]:
-    """Load and return all Scenario objects from scenarios/easy."""
-
+    """Load and return all Scenario objects from scenarios/{difficulty}/ directories."""
+    scenarios = []
     # Find every JSON scenario file in a deterministic order.
-    scenario_files = sorted(SCENARIOS_EASY_DIR.glob("*.json"))
-    if not scenario_files:
-        raise FileNotFoundError(
-            f"No scenario JSON files found in: {SCENARIOS_EASY_DIR}"
-        )
+    for difficulty in ["easy", "medium", "hard"]:
+        folder = SCENARIOS_BASE_DIR / difficulty
 
-    scenarios: list[Scenario] = []
-    for scenario_file in scenario_files:
-        # Read each JSON file and validate it against the Scenario schema.
-        with scenario_file.open("r", encoding="utf-8") as f:
-            payload = json.load(f)
-        scenarios.append(Scenario.model_validate(payload))
+        if not folder.exists():
+            continue
+
+        for file in sorted(folder.glob("*.json")):
+            with file.open("r", encoding="utf-8") as f:
+                payload = json.load(f)
+            scenarios.append(Scenario.model_validate(payload))
 
     return scenarios
 
