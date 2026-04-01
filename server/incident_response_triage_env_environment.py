@@ -1,8 +1,5 @@
 from __future__ import annotations
 from uuid import uuid4
-import json
-import os
-import random
 
 
 from openenv.core.env_server.interfaces import Environment
@@ -129,46 +126,3 @@ class IncidentResponseTriageEnvironment(Environment):
     @property
     def state(self) -> State:
         return self._state
-
-
-if __name__ == "__main__":
-    env = IncidentResponseTriageEnvironment()
-
-    # reset() returns the initial observation.
-    observation = env.reset()
-    print(
-        "reset -> "
-        f"logs={len(observation.logs)}, metrics={len(observation.metrics)}, alerts={len(observation.alerts)}"
-    )
-
-    # Make the test deterministic for the hardcoded correct action below.
-    target = next(
-        (scenario for scenario in env.scenarios if scenario.scenario_id == "scenario_001"),
-        None,
-    )
-    if target is not None:
-        env.current_scenario = target
-
-    correct_action = IncidentResponseTriageAction(
-        action_type="identify_cause",
-        reasoning="Payment-service is timing out under load.",
-        answer="payment-service db connection pool exhaustion",
-    )
-    observation = env.step(correct_action)
-    print(
-        f"correct action reward={observation.reward}, done={observation.done}, final={observation.final_score}"
-    )
-
-    observation = env.reset()
-    if target is not None:
-        env.current_scenario = target
-
-    incorrect_action = IncidentResponseTriageAction(
-        action_type="identify_cause",
-        reasoning="Auth service looks unhealthy.",
-        answer="auth-service token issuer outage",
-    )
-    observation = env.step(incorrect_action)
-    print(
-        f"incorrect action reward={observation.reward}, done={observation.done}, final={observation.final_score}"
-    )
