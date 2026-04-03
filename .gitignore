@@ -9,6 +9,8 @@ venv/
 # Python cache
 __pycache__/
 *.pyc
+**/__pycache__/
+**/*.pyc
 
 # Environment variables
 .env
@@ -19,4 +21,4 @@ tests/
 .pytest_cache/
 htmlcov/
 .coverage
-coverage.xml
+coverage.xml

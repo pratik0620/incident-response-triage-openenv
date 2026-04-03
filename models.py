@@ -3,7 +3,6 @@ from pydantic import Field
 from typing import Literal, Optional
 from scenarios.schema import Alert, LogEntry, MetricSnapshot, GroundTruth
 
-# Re-exported so graders can use `from ..models import GroundTruth`
 __all__ = [
     "IncidentResponseTriageAction",
     "IncidentResponseTriageObservation",

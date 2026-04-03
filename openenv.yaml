@@ -5,3 +5,23 @@ runtime: fastapi
 app: server.app:app
 port: 8000
 
+description: Reinforcement Learning environment for an incident response triage in distributed microservice systems. Agents analyze logs, identify root causes and propose fixes.
+
+author:
+  - Pratik Morkar
+  - Nishant Ninawe
+  - Surabhi Nikam
+
+tags:
+  - incident-response
+  - devops
+  - sre
+  - reinforcement-learning
+  - debugging
+
+tasks:
+  - easy
+  - medium
+  - hard
+
+repository: https://github.com/pratik0620/incident-response-triage-openenv
