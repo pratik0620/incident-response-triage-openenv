@@ -1,3 +1,19 @@
+"""
+Inference Script — incident_response_triage_env
+================================================
+STDOUT FORMAT (mandatory):
+    [START] task=<task_name> env=<benchmark> model=<model_name>
+    [STEP]  step=<n> action=<action_str> reward=<0.00> done=<true|false> error=<msg|null>
+    [END]   success=<true|false> steps=<n> rewards=<r1,r2,...,rn>
+
+ENV VARS:
+    API_BASE_URL       LLM endpoint  (default: HuggingFace router)
+    MODEL_NAME         Model id       (default: Qwen/Qwen2.5-72B-Instruct)
+    HF_TOKEN / API_KEY Auth key
+    IMAGE_NAME         Docker image name for the environment
+    ENV_BASE_URL       Fallback if no docker image (default: http://localhost:8000)
+"""
+
 from __future__ import annotations
 
 import asyncio
@@ -13,9 +29,10 @@ load_dotenv()
 
 from openai import OpenAI
 
+
 def _ensure_package_loaded() -> None:
     try:
-        import incident_response_triage_env
+        import incident_response_triage_env  # noqa: F401
     except ModuleNotFoundError:
         import importlib.util
         import sys
@@ -39,15 +56,16 @@ def _ensure_package_loaded() -> None:
 
 
 _ensure_package_loaded()
-from incident_response_triage_env.client import IncidentResponseTriageEnv
-from incident_response_triage_env.models import IncidentResponseTriageAction
+
+from incident_response_triage_env.client import IncidentResponseTriageEnv  # noqa: E402
+from incident_response_triage_env.models import IncidentResponseTriageAction  # noqa: E402
 
 
+#==========Configuration (all overridable via environment variables)==========#
 API_KEY = os.getenv("HF_TOKEN") or os.getenv("API_KEY")
 API_BASE_URL = os.getenv("API_BASE_URL", "https://router.huggingface.co/v1")
 MODEL_NAME = os.getenv("MODEL_NAME", "Qwen/Qwen2.5-72B-Instruct")
-
-LOCAL_IMAGE_NAME = os.getenv("LOCAL_IMAGE_NAME") or os.getenv("IMAGE_NAME")
+IMAGE_NAME = os.getenv("IMAGE_NAME") or os.getenv("LOCAL_IMAGE_NAME")
 ENV_BASE_URL = os.getenv("ENV_BASE_URL", "http://localhost:8000")
 
 TASK_NAME = os.getenv("INCIDENT_TRIAGE_TASK", "incident-triage")
@@ -68,20 +86,20 @@ SYSTEM_PROMPT = textwrap.dedent(
     You are an on-call SRE triaging a microservice incident. You choose one action per turn.
 
     Allowed action_type values:
-    - read_logs — gather signal (small step cost; episode continues)
-    - check_metrics — gather signal (small step cost; episode continues)
-    - identify_cause — terminal: you must state the root cause (service + failure) in "answer"
-    - propose_fix — terminal: "answer" must include both root cause and a concrete fix/command
-    - escalate — terminal: hand off when you cannot diagnose; lower reward
+    - read_logs      — gather signal (small step cost; episode continues)
+    - check_metrics  — gather signal (small step cost; episode continues)
+    - identify_cause — terminal: state the root cause (service + failure) in "answer"
+    - propose_fix    — terminal: "answer" must include root cause AND a concrete fix/command
+    - escalate       — terminal: hand off when you cannot diagnose; lower reward
 
     Respond with a single JSON object only (no markdown), keys:
-      "action_type" (string, required)
-      "reasoning" (string, required)
-      "answer" (string or null) — required for identify_cause / propose_fix
-      "service" (string or null) — optional focus service
+      "action_type"  (string, required)
+      "reasoning"    (string, required)
+      "answer"       (string or null) — required for identify_cause / propose_fix
+      "service"      (string or null) — optional focus service
 
-    For hard difficulty, root-cause answers must also mention the failure category when using
-    identify_cause (real, flaky, intermittent, env_specific).
+    For hard difficulty, identify_cause answers must also mention the failure category:
+    real, flaky, intermittent, or env_specific.
     """
 ).strip()
 
@@ -90,13 +108,11 @@ def log_start(task: str, env: str, model: str) -> None:
     print(f"[START] task={task} env={env} model={model}", flush=True)
 
 
-def log_step(
-    step: int, action: str, reward: float, done: bool, error: Optional[str]
-) -> None:
-    err = "null" if error is None else error.replace("\n", " ").replace("\r", " ")
+def log_step(step: int, action: str, reward: float, done: bool, error: Optional[str]) -> None:
+    error_val = error.replace("\n", " ").replace("\r", " ") if error else "null"
     print(
         f"[STEP] step={step} action={action} reward={reward:.2f} "
-        f"done={str(done).lower()} error={err}",
+        f"done={str(done).lower()} error={error_val}",
         flush=True,
     )
 
@@ -111,36 +127,21 @@ def log_end(success: bool, steps: int, rewards: List[float]) -> None:
 
 def _log_entry_line(entry: Any) -> str:
     if isinstance(entry, dict):
-        ts = entry.get("timestamp", "")
-        svc = entry.get("service", "")
-        lvl = entry.get("level", "")
-        msg = entry.get("message", "")
+        ts, svc, lvl, msg = entry.get("timestamp",""), entry.get("service",""), entry.get("level",""), entry.get("message","")
     else:
-        ts = getattr(entry, "timestamp", "")
-        svc = getattr(entry, "service", "")
-        lvl = getattr(entry, "level", "")
-        msg = getattr(entry, "message", "")
+        ts, svc, lvl, msg = getattr(entry,"timestamp",""), getattr(entry,"service",""), getattr(entry,"level",""), getattr(entry,"message","")
     return f"  [{ts}] {svc} {lvl}: {msg}"
 
 
 def _metric_line(m: Any) -> str:
     if isinstance(m, dict):
-        return (
-            f"  {m.get('service')}: cpu={m.get('cpu_pct')}% mem={m.get('mem_pct')}% "
-            f"err_rate={m.get('error_rate')} p99_ms={m.get('latency_p99_ms')}"
-        )
-    return (
-        f"  {m.service}: cpu={m.cpu_pct}% mem={m.mem_pct}% "
-        f"err_rate={m.error_rate} p99_ms={m.latency_p99_ms}"
-    )
+        return f"  {m.get('service')}: cpu={m.get('cpu_pct')}% mem={m.get('mem_pct')}% err_rate={m.get('error_rate')} p99_ms={m.get('latency_p99_ms')}"
+    return f"  {m.service}: cpu={m.cpu_pct}% mem={m.mem_pct}% err_rate={m.error_rate} p99_ms={m.latency_p99_ms}"
 
 
 def _alert_line(a: Any) -> str:
     if isinstance(a, dict):
-        return (
-            f"  {a.get('alert_id')} {a.get('severity')} {a.get('service')}: "
-            f"{a.get('message')}"
-        )
+        return f"  {a.get('alert_id')} {a.get('severity')} {a.get('service')}: {a.get('message')}"
     return f"  {a.alert_id} {a.severity} {a.service}: {a.message}"
 
 
@@ -179,11 +180,9 @@ def _extract_json_object(text: str) -> dict[str, Any]:
     text = (text or "").strip()
     if not text:
         raise ValueError("empty model response")
-
     fence = re.search(r"```(?:json)?\s*([\s\S]*?)\s*```", text, re.IGNORECASE)
     if fence:
         text = fence.group(1).strip()
-
     return json.loads(text)
 
 
@@ -193,7 +192,7 @@ def parse_model_to_action(raw: str) -> IncidentResponseTriageAction:
     except (json.JSONDecodeError, ValueError) as exc:
         return IncidentResponseTriageAction(
             action_type="read_logs",
-            reasoning=f"Model output not valid JSON; probing logs. ({exc})",
+            reasoning=f"Model output not valid JSON; defaulting to read_logs. ({exc})",
             answer=None,
             service=None,
         )
@@ -223,16 +222,13 @@ def parse_model_to_action(raw: str) -> IncidentResponseTriageAction:
     )
 
 
-def action_to_log_line(action: IncidentResponseTriageAction) -> str:
-    """Single-line action summary for [STEP] (no embedded newlines)."""
-    parts = [
-        f"{action.action_type}",
-        f"reasoning={action.reasoning[:400]}",
-    ]
+def action_to_log_str(action: IncidentResponseTriageAction) -> str:
+    """Single-line action summary for [STEP] — no embedded newlines."""
+    parts = [f"{action.action_type}", f"reasoning={action.reasoning[:200]}"]
     if action.service:
         parts.append(f"service={action.service}")
     if action.answer:
-        parts.append(f"answer={action.answer[:500]}")
+        parts.append(f"answer={action.answer[:300]}")
     return "|".join(parts).replace("\n", " ").replace("\r", " ")
 
 
@@ -242,7 +238,7 @@ def get_model_action(client: OpenAI, user_prompt: str) -> Tuple[IncidentResponse
             model=MODEL_NAME,
             messages=[
                 {"role": "system", "content": SYSTEM_PROMPT},
-                {"role": "user", "content": user_prompt},
+                {"role": "user",   "content": user_prompt},
             ],
             temperature=TEMPERATURE,
             max_tokens=MAX_TOKENS,
@@ -250,13 +246,11 @@ def get_model_action(client: OpenAI, user_prompt: str) -> Tuple[IncidentResponse
         )
         raw = (completion.choices[0].message.content or "").strip()
     except Exception as exc:
-        raw = json.dumps(
-            {
-                "action_type": "read_logs",
-                "reasoning": f"LLM error: {exc}",
-                "answer": None,
-            }
-        )
+        raw = json.dumps({
+            "action_type": "read_logs",
+            "reasoning": f"LLM error: {exc}",
+            "answer": None,
+        })
 
     action = parse_model_to_action(raw)
     return action, raw.replace("\n", " ")[:800]
@@ -264,10 +258,7 @@ def get_model_action(client: OpenAI, user_prompt: str) -> Tuple[IncidentResponse
 
 async def main() -> None:
     if not API_KEY:
-        print(
-            "[DEBUG] HF_TOKEN or API_KEY is not set; LLM calls will fail.",
-            flush=True,
-        )
+        print("[DEBUG] HF_TOKEN / API_KEY not set — LLM calls will fail.", flush=True)
 
     client = OpenAI(base_url=API_BASE_URL, api_key=API_KEY or "")
 
@@ -279,8 +270,8 @@ async def main() -> None:
     log_start(task=TASK_NAME, env=BENCHMARK, model=MODEL_NAME)
 
     try:
-        if LOCAL_IMAGE_NAME:
-            env = await IncidentResponseTriageEnv.from_docker_image(LOCAL_IMAGE_NAME)
+        if IMAGE_NAME:
+            env = await IncidentResponseTriageEnv.from_docker_image(IMAGE_NAME)
         else:
             env = IncidentResponseTriageEnv(base_url=ENV_BASE_URL)
             await env.connect()
@@ -293,21 +284,15 @@ async def main() -> None:
                 break
 
             user_prompt = build_observation_prompt(obs)
-            action, _raw_snippet = get_model_action(client, user_prompt)
-            line = action_to_log_line(action)
+            action, _raw = get_model_action(client, user_prompt)
+            action_log_str = action_to_log_str(action)
 
             try:
                 result = await env.step(action)
             except Exception as exc:
                 rewards.append(0.0)
                 steps_taken = obs.step + 1
-                log_step(
-                    step=steps_taken,
-                    action=line,
-                    reward=0.00,
-                    done=False,
-                    error=str(exc),
-                )
+                log_step(step=steps_taken, action=action_log_str, reward=0.0, done=False, error=str(exc))
                 break
 
             reward = float(result.reward if result.reward is not None else 0.0)
@@ -316,13 +301,8 @@ async def main() -> None:
 
             rewards.append(reward)
             steps_taken = obs.step
-            log_step(
-                step=obs.step,
-                action=line,
-                reward=reward,
-                done=done,
-                error=None,
-            )
+
+            log_step(step=obs.step, action=action_log_str, reward=reward, done=done, error=None)
 
             if done:
                 fs = getattr(obs, "final_score", None)

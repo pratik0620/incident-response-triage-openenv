@@ -22,3 +22,7 @@ tests/
 htmlcov/
 .coverage
 coverage.xml
+
+*.egg-info/
+dist/
+build/
