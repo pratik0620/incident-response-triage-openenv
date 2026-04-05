@@ -1,9 +1,3 @@
-# Copyright (c) Meta Platforms, Inc. and affiliates.
-# All rights reserved.
-#
-# This source code is licensed under the BSD-style license found in the
-# LICENSE file in the root directory of this source tree.
-
 """
 Dynamic Weight Engine and Conditional Adjustment Rules.
 
@@ -102,12 +96,50 @@ _WEIGHT_TABLE: Dict[str, SignalWeights] = {
 }
 
 
+def _redistribute_fix_weight_for_identify(weights: SignalWeights) -> SignalWeights:
+    """
+    Move fix_quality weight into root_cause and reasoning for identify_cause.
+
+    This keeps the total at 1.0 while avoiding a guaranteed 0.0 component
+    when fix_quality is not evaluated.
+    """
+    if weights.fix_quality <= 0.0:
+        return weights
+
+    target_total = weights.root_cause + weights.reasoning
+    if target_total <= 0.0:
+        return weights
+
+    shift = weights.fix_quality
+    root_share = weights.root_cause / target_total
+    reasoning_share = weights.reasoning / target_total
+
+    return SignalWeights(
+        root_cause=weights.root_cause + shift * root_share,
+        fix_quality=0.0,
+        reasoning=weights.reasoning + shift * reasoning_share,
+        faithfulness=weights.faithfulness,
+        noise=weights.noise,
+        efficiency=weights.efficiency,
+    )
+
+
 def get_weights(difficulty: str) -> SignalWeights:
     """
     Return the SignalWeights for a given difficulty string.
     Unknown difficulty strings fall back to MEDIUM (safe default).
     """
     return _WEIGHT_TABLE.get(difficulty.lower(), WEIGHTS_MEDIUM)
+
+
+def get_weights_for_action(difficulty: str, action_type: str) -> SignalWeights:
+    """
+    Return action-aware weights (e.g., identify_cause on easy difficulty).
+    """
+    base = get_weights(difficulty)
+    if difficulty.lower() == "easy" and action_type == "identify_cause":
+        return _redistribute_fix_weight_for_identify(base)
+    return base
 
 
 # ─────────────────────────────────────────────────────────────────────────────

@@ -1,9 +1,3 @@
-# Copyright (c) Meta Platforms, Inc. and affiliates.
-# All rights reserved.
-#
-# This source code is licensed under the BSD-style license found in the
-# LICENSE file in the root directory of this source tree.
-
 """
 Composite Grader — the single entry point called by environment.py.
 
@@ -58,7 +52,7 @@ from .signals import (
     reasoning_signal,
     root_cause_signal,
 )
-from .weights import apply_adjustment_rules, get_weights, weighted_sum
+from .weights import apply_adjustment_rules, get_weights_for_action, weighted_sum
 
 if TYPE_CHECKING:
     from ..models import GroundTruth
@@ -134,7 +128,7 @@ def compute_final_score(
     sig_f = efficiency_signal(steps_used, max_steps)
 
     # ── Get difficulty-appropriate weights ────────────────────────────────────
-    weights = get_weights(difficulty)
+    weights = get_weights_for_action(difficulty, action_type)
 
     # ── Weighted sum ──────────────────────────────────────────────────────────
     base = weighted_sum(
@@ -219,7 +213,7 @@ def compute_score_breakdown(
     sig_e = noise_signal(answer, ground_truth)
     sig_f = efficiency_signal(steps_used, max_steps)
 
-    weights = get_weights(difficulty)
+    weights = get_weights_for_action(difficulty, action_type)
     base = weighted_sum(sig_a, sig_b, sig_c, sig_d, sig_e, sig_f, weights)
     final = apply_adjustment_rules(base, sig_a, sig_b, sig_c, sig_e, difficulty)
     final = round(max(0.0, min(final, 1.0)), 4)

@@ -1,9 +1,3 @@
-# Copyright (c) Meta Platforms, Inc. and affiliates.
-# All rights reserved.
-#
-# This source code is licensed under the BSD-style license found in the
-# LICENSE file in the root directory of this source tree.
-
 """
 Multi-Signal Grader — six independent scoring signals (A through F).
 
@@ -284,11 +278,13 @@ def noise_signal(answer: str, ground_truth: "GroundTruth") -> float:
             # Check if agent explicitly ruled it out
             # e.g. "frontend-service is not the cause"
             ruled_out = any(
-                f"{rh_lower} is not" in answer_lower
-                or f"not {rh_lower}" in answer_lower
-                or f"ruled out {rh_lower}" in answer_lower
-                or f"{rh_lower} does not" in answer_lower
-                for _ in [1]  # single iteration trick for early-exit
+                phrase in answer_lower
+                for phrase in (
+                    f"{rh_lower} is not",
+                    f"not {rh_lower}",
+                    f"ruled out {rh_lower}",
+                    f"{rh_lower} does not",
+                )
             )
             if ruled_out:
                 score += 0.05  # Small bonus for explicit ruling out

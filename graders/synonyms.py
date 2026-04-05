@@ -1,9 +1,3 @@
-# Copyright (c) Meta Platforms, Inc. and affiliates.
-# All rights reserved.
-#
-# This source code is licensed under the BSD-style license found in the
-# LICENSE file in the root directory of this source tree.
-
 """
 Synonym and keyword maps used across all graders.
 
@@ -87,6 +81,18 @@ CAUSE_SYNONYMS: Dict[str, List[str]] = {
         "flaky", "flaky test", "intermittent", "non-deterministic",
         "timing issue", "race in test",
     ],
+    "cache_warmup_failed": [
+        "cache miss", "cache cold", "warm-up failed", "cache warmup",
+        "cold cache", "cache not populated",
+    ],
+    "stale_jwks_cache": [
+        "stale key", "jwks", "jwt key", "key rotation", "stale cache",
+        "token key", "signing key",
+    ],
+    "worker_rate_limit_misconfiguration": [
+        "rate limit", "worker limit", "throughput limit", "misconfiguration",
+        "wrong config", "rate config",
+    ],
 }
 
 # ─────────────────────────────────────────────────────────────────────────────
@@ -155,6 +161,27 @@ FIX_TIERS: Dict[str, Dict[str, List[str]]] = {
         "tier_3": ["lock order", "timeout", "retry", "monitor", "deadlock detection",
                    "transaction", "alert"],
     },
+    "cache_warmup_failed": {
+        "tier_1": ["restart", "redeploy", "rollback"],
+        "tier_2": ["warmup", "warm-up", "preload", "populate cache", "cache warm",
+                   "seed cache"],
+        "tier_3": ["warmup job", "startup check", "monitor", "alert",
+                   "cache warmup"],
+    },
+    "stale_jwks_cache": {
+        "tier_1": ["restart", "redeploy", "rollback"],
+        "tier_2": ["jwks", "refresh", "invalidate cache", "cache ttl",
+                   "key rotation", "fetch keys"],
+        "tier_3": ["auto refresh", "background refresh", "monitor", "alert",
+                   "shorten ttl"],
+    },
+    "worker_rate_limit_misconfiguration": {
+        "tier_1": ["restart", "redeploy", "rollback"],
+        "tier_2": ["rate limit", "worker limit", "throughput", "config",
+                   "increase", "adjust"],
+        "tier_3": ["config validation", "monitor", "alert", "canary",
+                   "rate limit policy"],
+    },
 }
 
 # ─────────────────────────────────────────────────────────────────────────────
@@ -212,8 +239,7 @@ OVER_GUESS_PHRASES: List[str] = [
 SUPERFICIAL_FIX_PHRASES: List[str] = [
     "restart the service", "restart service", "redeploy", "rollback",
     "reboot", "kill the process", "restart the pod", "restart pod",
-    # Also match bare "restart" (followed by anything, including a service name)
-    "restart",
+    "just restart",
 ]
 
 
