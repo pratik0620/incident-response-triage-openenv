@@ -1,0 +1,192 @@
+{
+  "scenario_id": "hard_003",
+  "difficulty": "hard",
+  "title": "Auth service token cache memory pressure cascades through payment validation",
+  "description": "Auth service JWKS cache accumulates expired entries without cleanup, causing GC pressure and validation latency that blocks payment processing through order flow.",
+  "logs": [
+    {
+      "timestamp": "2026-04-01T12:15:00Z",
+      "service": "auth-service",
+      "message": "Token cache entries: 4200 items (estimated 850MB heap usage)",
+      "level": "INFO"
+    },
+    {
+      "timestamp": "2026-04-01T12:15:08Z",
+      "service": "auth-service",
+      "message": "JWKS validation batch request completed: avg latency 180ms",
+      "level": "INFO"
+    },
+    {
+      "timestamp": "2026-04-01T12:15:15Z",
+      "service": "auth-service",
+      "message": "GC pause detected: 0.8s young generation collection",
+      "level": "WARN"
+    },
+    {
+      "timestamp": "2026-04-01T12:15:22Z",
+      "service": "auth-service",
+      "message": "Token cache entries: 8950 items, cleanup scan removed 30 expired entries",
+      "level": "INFO"
+    },
+    {
+      "timestamp": "2026-04-01T12:15:30Z",
+      "service": "auth-service",
+      "message": "Validation latency p99: 1450ms (normal baseline 280ms), 4.2x increase",
+      "level": "WARN"
+    },
+    {
+      "timestamp": "2026-04-01T12:15:37Z",
+      "service": "payment-service",
+      "message": "Auth service token validation taking >1000ms on 31% of transaction attempts",
+      "level": "ERROR"
+    },
+    {
+      "timestamp": "2026-04-01T12:15:45Z",
+      "service": "payment-service",
+      "message": "Retry backoff strategy: exponential delay applied to 156 pending transaction validations",
+      "level": "WARN"
+    },
+    {
+      "timestamp": "2026-04-01T12:15:52Z",
+      "service": "order-service",
+      "message": "Payment validation dependency experiencing 28% timeout rate",
+      "level": "ERROR"
+    },
+    {
+      "timestamp": "2026-04-01T12:16:00Z",
+      "service": "order-service",
+      "message": "Order fulfillment queue backlog: 643 pending (normal: 85)",
+      "level": "ERROR"
+    },
+    {
+      "timestamp": "2026-04-01T12:16:07Z",
+      "service": "api-gateway",
+      "message": "POST /checkout returned 504 (Gateway Timeout): order-service payment validation chain timeout",
+      "level": "ERROR"
+    },
+    {
+      "timestamp": "2026-04-01T12:16:14Z",
+      "service": "redis-cache",
+      "message": "Redis memory usage: 2.4GB (soft limit 2.0GB) - eviction policy active",
+      "level": "WARN"
+    },
+    {
+      "timestamp": "2026-04-01T12:16:21Z",
+      "service": "redis-cache",
+      "message": "Evicted 1200 keys due to memory pressure, hit rate dropped to 71%",
+      "level": "WARN"
+    },
+    {
+      "timestamp": "2026-04-01T12:16:28Z",
+      "service": "metrics-exporter",
+      "message": "Histogram quantile calculation for auth module took 850ms",
+      "level": "WARN"
+    },
+    {
+      "timestamp": "2026-04-01T12:16:35Z",
+      "service": "auth-service",
+      "message": "GC pause detected: 1.6s full collection, heap at 76% utilization",
+      "level": "WARN"
+    }
+  ],
+  "metrics": [
+    {
+      "service": "auth-service",
+      "cpu_pct": 64.2,
+      "mem_pct": 76.3,
+      "error_rate": 0.12,
+      "latency_p99_ms": 3100.0
+    },
+    {
+      "service": "payment-service",
+      "cpu_pct": 69.8,
+      "mem_pct": 68.4,
+      "error_rate": 0.27,
+      "latency_p99_ms": 5200.0
+    },
+    {
+      "service": "order-service",
+      "cpu_pct": 74.1,
+      "mem_pct": 71.2,
+      "error_rate": 0.34,
+      "latency_p99_ms": 5800.0
+    },
+    {
+      "service": "api-gateway",
+      "cpu_pct": 59.3,
+      "mem_pct": 62.8,
+      "error_rate": 0.24,
+      "latency_p99_ms": 4100.0
+    },
+    {
+      "service": "redis-cache",
+      "cpu_pct": 48.7,
+      "mem_pct": 89.2,
+      "error_rate": 0.04,
+      "latency_p99_ms": 620.0
+    },
+    {
+      "service": "metrics-exporter",
+      "cpu_pct": 73.9,
+      "mem_pct": 54.6,
+      "error_rate": 0.02,
+      "latency_p99_ms": 1800.0
+    }
+  ],
+  "alerts": [
+    {
+      "alert_id": "A-H003-1",
+      "service": "auth-service",
+      "severity": "P1",
+      "message": "Auth service memory utilization elevated and GC pause duration increasing",
+      "fired_at": "2026-04-01T12:15:31Z"
+    },
+    {
+      "alert_id": "A-H003-2",
+      "service": "payment-service",
+      "severity": "P2",
+      "message": "Payment service error rate and latency spike due to auth dependency timeout",
+      "fired_at": "2026-04-01T12:15:38Z"
+    },
+    {
+      "alert_id": "A-H003-3",
+      "service": "order-service",
+      "severity": "P2",
+      "message": "Order service queue backlog exceeding SLA due to payment processing delays",
+      "fired_at": "2026-04-01T12:16:01Z"
+    },
+    {
+      "alert_id": "A-H003-4",
+      "service": "api-gateway",
+      "severity": "P2",
+      "message": "API gateway 504 errors due to cascading timeout in order-payment-auth chain",
+      "fired_at": "2026-04-01T12:16:08Z"
+    },
+    {
+      "alert_id": "A-H003-5",
+      "service": "redis-cache",
+      "severity": "P3",
+      "message": "Redis memory pressure causing key evictions",
+      "fired_at": "2026-04-01T12:16:22Z"
+    },
+    {
+      "alert_id": "A-H003-6",
+      "service": "metrics-exporter",
+      "severity": "P3",
+      "message": "Metrics export latency increased",
+      "fired_at": "2026-04-01T12:16:29Z"
+    }
+  ],
+  "ground_truth": {
+    "root_cause_service": "auth-service",
+    "root_cause_type": "unbounded_token_cache_growth",
+    "correct_fix": "Add cache eviction policy: maxSize=3000, ttl=3600s; implement cleanup job for expired entries; apply -XX:+UseG1GC tuning; kubectl rollout restart deploy/auth-service",
+    "failure_category": "flaky",
+    "severity": "P1",
+    "red_herrings": [
+      "redis-cache",
+      "metrics-exporter"
+    ]
+  },
+  "max_steps": 20
+}

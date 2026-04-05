@@ -1,0 +1,185 @@
+{
+  "scenario_id": "hard_002",
+  "difficulty": "hard",
+  "title": "Payment service database connection leak blocks order processing",
+  "description": "Payment service accumulates unclosed database connections, starving the pool and causing cascading timeouts through order-service to API gateway.",
+  "logs": [
+    {
+      "timestamp": "2026-04-01T10:30:00Z",
+      "service": "payment-service",
+      "message": "Database connection pool utilization: 65/100 active connections",
+      "level": "INFO"
+    },
+    {
+      "timestamp": "2026-04-01T10:30:10Z",
+      "service": "payment-service",
+      "message": "Partial transaction retry: 3 attempts for charge ID px_892847 after intermittent DB timeout",
+      "level": "WARN"
+    },
+    {
+      "timestamp": "2026-04-01T10:30:20Z",
+      "service": "payment-service",
+      "message": "Connection pool utilization: 78/100 active connections, 12 waiting in queue",
+      "level": "WARN"
+    },
+    {
+      "timestamp": "2026-04-01T10:30:25Z",
+      "service": "payment-service",
+      "message": "Payment processing latency increased: p99=3200ms (baseline 1200ms)",
+      "level": "WARN"
+    },
+    {
+      "timestamp": "2026-04-01T10:30:30Z",
+      "service": "payment-service",
+      "message": "Schema migration job completed successfully on replica shard",
+      "level": "INFO"
+    },
+    {
+      "timestamp": "2026-04-01T10:30:35Z",
+      "service": "order-service",
+      "message": "Payment service validation timeout on 24% of new order requests",
+      "level": "ERROR"
+    },
+    {
+      "timestamp": "2026-04-01T10:30:40Z",
+      "service": "order-service",
+      "message": "Order processing layer: 568 pending orders in queue (normal baseline: 120)",
+      "level": "WARN"
+    },
+    {
+      "timestamp": "2026-04-01T10:30:45Z",
+      "service": "order-service",
+      "message": "Worker thread saturation: thread pool 45/50 threads occupied, avg queue wait 2.3s",
+      "level": "ERROR"
+    },
+    {
+      "timestamp": "2026-04-01T10:30:50Z",
+      "service": "inventory-service",
+      "message": "Stock reservation requests pending: orders waiting for confirmation reached 780",
+      "level": "WARN"
+    },
+    {
+      "timestamp": "2026-04-01T10:30:55Z",
+      "service": "api-gateway",
+      "message": "POST /orders returned 503 (Service Unavailable): order-service queue full",
+      "level": "ERROR"
+    },
+    {
+      "timestamp": "2026-04-01T10:31:00Z",
+      "service": "monitoring-collector",
+      "message": "Scrape interval exceeded: Prometheus metrics collection took 4.2s instead of 1.5s",
+      "level": "WARN"
+    },
+    {
+      "timestamp": "2026-04-01T10:31:05Z",
+      "service": "payment-service",
+      "message": "Connection pool utilization: 94/100 active connections, 38 in queue, 2 timeouts waiting for slot",
+      "level": "FATAL"
+    },
+    {
+      "timestamp": "2026-04-01T10:31:10Z",
+      "service": "background-job-processor",
+      "message": "Background job: daily_report_generation started, ETA 8 minutes",
+      "level": "INFO"
+    },
+    {
+      "timestamp": "2026-04-01T10:31:15Z",
+      "service": "api-gateway",
+      "message": "GET /user/orders returned 200 OK with cached dataset",
+      "level": "INFO"
+    }
+  ],
+  "metrics": [
+    {
+      "service": "payment-service",
+      "cpu_pct": 58.9,
+      "mem_pct": 64.2,
+      "error_rate": 0.19,
+      "latency_p99_ms": 5600.0
+    },
+    {
+      "service": "order-service",
+      "cpu_pct": 72.4,
+      "mem_pct": 75.8,
+      "error_rate": 0.31,
+      "latency_p99_ms": 6200.0
+    },
+    {
+      "service": "inventory-service",
+      "cpu_pct": 41.3,
+      "mem_pct": 59.6,
+      "error_rate": 0.08,
+      "latency_p99_ms": 2100.0
+    },
+    {
+      "service": "api-gateway",
+      "cpu_pct": 55.1,
+      "mem_pct": 61.7,
+      "error_rate": 0.22,
+      "latency_p99_ms": 3450.0
+    },
+    {
+      "service": "monitoring-collector",
+      "cpu_pct": 67.8,
+      "mem_pct": 52.1,
+      "error_rate": 0.02,
+      "latency_p99_ms": 2300.0
+    },
+    {
+      "service": "background-job-processor",
+      "cpu_pct": 43.2,
+      "mem_pct": 55.3,
+      "error_rate": 0.01,
+      "latency_p99_ms": 1200.0
+    }
+  ],
+  "alerts": [
+    {
+      "alert_id": "A-H002-1",
+      "service": "payment-service",
+      "severity": "P1",
+      "message": "Payment service database pool saturation and connection timeout events detected",
+      "fired_at": "2026-04-01T10:31:06Z"
+    },
+    {
+      "alert_id": "A-H002-2",
+      "service": "order-service",
+      "severity": "P2",
+      "message": "Order service error rate elevated and queue backlog exceeding threshold",
+      "fired_at": "2026-04-01T10:30:46Z"
+    },
+    {
+      "alert_id": "A-H002-3",
+      "service": "api-gateway",
+      "severity": "P2",
+      "message": "API gateway 503 errors caused by downstream order service unavailability",
+      "fired_at": "2026-04-01T10:30:56Z"
+    },
+    {
+      "alert_id": "A-H002-4",
+      "service": "monitoring-collector",
+      "severity": "P3",
+      "message": "Metrics collection latency spike detected",
+      "fired_at": "2026-04-01T10:31:01Z"
+    },
+    {
+      "alert_id": "A-H002-5",
+      "service": "background-job-processor",
+      "severity": "P3",
+      "message": "Background job execution started consuming resources",
+      "fired_at": "2026-04-01T10:31:11Z"
+    }
+  ],
+  "ground_truth": {
+    "root_cause_service": "payment-service",
+    "root_cause_type": "database_connection_leak",
+    "correct_fix": "Enable connection leak detection: -Dcom.zaxxer.hikari.debugMode=true; review code for unclosed ResultSet/PreparedStatement in payment transaction handlers; add try-with-resources pattern; redeploy",
+    "failure_category": "env_specific",
+    "severity": "P1",
+    "red_herrings": [
+      "monitoring-collector",
+      "background-job-processor"
+    ]
+  },
+  "max_steps": 20
+}

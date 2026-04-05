@@ -1,0 +1,192 @@
+{
+  "scenario_id": "hard_004",
+  "difficulty": "hard",
+  "title": "Inventory event processor bottleneck starves order and catalog systems",
+  "description": "Inventory service event processing stream falls behind, creating cascading backlog through order confirmations and catalog stock updates, reaching API gateway users.",
+  "logs": [
+    {
+      "timestamp": "2026-04-01T14:42:00Z",
+      "service": "inventory-service",
+      "message": "Event stream processing: 1250 events/sec ingested, 890 events/sec processed",
+      "level": "INFO"
+    },
+    {
+      "timestamp": "2026-04-01T14:42:08Z",
+      "service": "inventory-service",
+      "message": "Consumed offset lag: 2.3 minutes behind latest committed offset",
+      "level": "WARN"
+    },
+    {
+      "timestamp": "2026-04-01T14:42:15Z",
+      "service": "inventory-service",
+      "message": "Processing latency p99: 2100ms for stock mutation events (baseline 350ms)",
+      "level": "WARN"
+    },
+    {
+      "timestamp": "2026-04-01T14:42:22Z",
+      "service": "inventory-service",
+      "message": "Batched read of 250 SKU records from database completed successfully",
+      "level": "INFO"
+    },
+    {
+      "timestamp": "2026-04-01T14:42:30Z",
+      "service": "order-service",
+      "message": "Stock reservation confirmation timeout from inventory: 18% of order confirmations delayed >4s",
+      "level": "ERROR"
+    },
+    {
+      "timestamp": "2026-04-01T14:42:37Z",
+      "service": "order-service",
+      "message": "Order confirmation publishing queue: 567 messages waiting for acknowledgment (normal: 40)",
+      "level": "ERROR"
+    },
+    {
+      "timestamp": "2026-04-01T14:42:45Z",
+      "service": "catalog-service",
+      "message": "Stock sync events queued: 1204 pending updates unable to commit",
+      "level": "ERROR"
+    },
+    {
+      "timestamp": "2026-04-01T14:42:52Z",
+      "service": "catalog-service",
+      "message": "Product availability stale: max 8 minutes out of sync for 34% of active SKUs",
+      "level": "ERROR"
+    },
+    {
+      "timestamp": "2026-04-01T14:43:00Z",
+      "service": "api-gateway",
+      "message": "GET /inventory/:sku returned 503 (Service Unavailable): catalog-service sync queue overloaded",
+      "level": "ERROR"
+    },
+    {
+      "timestamp": "2026-04-01T14:43:07Z",
+      "service": "api-gateway",
+      "message": "POST /orders returned 503 (Service Unavailable): order confirmation publishing backlog",
+      "level": "ERROR"
+    },
+    {
+      "timestamp": "2026-04-01T14:43:14Z",
+      "service": "notification-queue",
+      "message": "Order confirmation email queue backlog: 2100 pending messages",
+      "level": "WARN"
+    },
+    {
+      "timestamp": "2026-04-01T14:43:21Z",
+      "service": "notification-queue",
+      "message": "Email send throughput: 12 emails/min (baseline 280 emails/min), 95% reduction",
+      "level": "WARN"
+    },
+    {
+      "timestamp": "2026-04-01T14:43:28Z",
+      "service": "data-sync-job",
+      "message": "Daily sync job started: data warehouse snapshot scheduled",
+      "level": "INFO"
+    },
+    {
+      "timestamp": "2026-04-01T14:43:35Z",
+      "service": "inventory-service",
+      "message": "CPU throttling detected: workload exceeding allocation, processing falling further behind",
+      "level": "WARN"
+    }
+  ],
+  "metrics": [
+    {
+      "service": "inventory-service",
+      "cpu_pct": 87.4,
+      "mem_pct": 72.1,
+      "error_rate": 0.09,
+      "latency_p99_ms": 4200.0
+    },
+    {
+      "service": "order-service",
+      "cpu_pct": 71.2,
+      "mem_pct": 68.7,
+      "error_rate": 0.29,
+      "latency_p99_ms": 5100.0
+    },
+    {
+      "service": "catalog-service",
+      "cpu_pct": 63.8,
+      "mem_pct": 74.3,
+      "error_rate": 0.22,
+      "latency_p99_ms": 4600.0
+    },
+    {
+      "service": "api-gateway",
+      "cpu_pct": 58.1,
+      "mem_pct": 59.4,
+      "error_rate": 0.26,
+      "latency_p99_ms": 3900.0
+    },
+    {
+      "service": "notification-queue",
+      "cpu_pct": 34.6,
+      "mem_pct": 78.5,
+      "error_rate": 0.03,
+      "latency_p99_ms": 1200.0
+    },
+    {
+      "service": "data-sync-job",
+      "cpu_pct": 52.3,
+      "mem_pct": 61.2,
+      "error_rate": 0.01,
+      "latency_p99_ms": 3100.0
+    }
+  ],
+  "alerts": [
+    {
+      "alert_id": "A-H004-1",
+      "service": "inventory-service",
+      "severity": "P1",
+      "message": "Inventory event stream processing lag exceeding SLA with increasing offset divergence",
+      "fired_at": "2026-04-01T14:42:09Z"
+    },
+    {
+      "alert_id": "A-H004-2",
+      "service": "order-service",
+      "severity": "P2",
+      "message": "Order service confirmation latency spike due to inventory dependency backlog",
+      "fired_at": "2026-04-01T14:42:31Z"
+    },
+    {
+      "alert_id": "A-H004-3",
+      "service": "catalog-service",
+      "severity": "P2",
+      "message": "Catalog service stock sync queue overflowing and data freshness degraded",
+      "fired_at": "2026-04-01T14:42:53Z"
+    },
+    {
+      "alert_id": "A-H004-4",
+      "service": "api-gateway",
+      "severity": "P2",
+      "message": "API gateway 503 errors across inventory and order endpoints",
+      "fired_at": "2026-04-01T14:43:01Z"
+    },
+    {
+      "alert_id": "A-H004-5",
+      "service": "notification-queue",
+      "severity": "P3",
+      "message": "Notification service queue not keeping pace with message production",
+      "fired_at": "2026-04-01T14:43:22Z"
+    },
+    {
+      "alert_id": "A-H004-6",
+      "service": "data-sync-job",
+      "severity": "P3",
+      "message": "Data warehouse sync job execution started",
+      "fired_at": "2026-04-01T14:43:29Z"
+    }
+  ],
+  "ground_truth": {
+    "root_cause_service": "inventory-service",
+    "root_cause_type": "event_stream_consumer_lag",
+    "correct_fix": "Scale event processor consumer group: increase num.stream.threads=8; add more consumer instances; optimize event processing logic; check Kafka partition rebalancing; kubectl scale deploy/inventory-service --replicas=3",
+    "failure_category": "env_specific",
+    "severity": "P1",
+    "red_herrings": [
+      "notification-queue",
+      "data-sync-job"
+    ]
+  },
+  "max_steps": 20
+}

@@ -7,42 +7,42 @@
     {
       "timestamp": "2026-03-30T11:02:10Z",
       "service": "api-gateway",
-      "message": "Intermittent 5xx responses observed on /charge during checkout bursts",
+      "message": "POST /charge returned 502 because payment-service timed out",
       "level": "ERROR"
     },
     {
       "timestamp": "2026-03-30T11:02:12Z",
       "service": "payment-service",
-      "message": "Backend session initialization repeatedly timing out during request spikes",
+      "message": "Failed to acquire DB connection: timeout after 5000ms",
       "level": "ERROR"
     },
     {
       "timestamp": "2026-03-30T11:02:13Z",
       "service": "payment-service",
-      "message": "Retry budget exceeded after multiple transient transaction failures",
+      "message": "Connection pool exhausted: max_connections=12 active=12 waiting=37",
       "level": "WARN"
     },
     {
       "timestamp": "2026-03-30T11:02:15Z",
       "service": "auth-service",
-      "message": "JWT issuer lookup cache hit",
+      "message": "Auth checks healthy: token verification succeeded",
       "level": "DEBUG"
     }
   ],
   "metrics": [
     {
       "service": "payment-service",
-      "cpu_pct": 63.3,
-      "mem_pct": 69.2,
-      "error_rate": 0.22,
-      "latency_p99_ms": 3900.0
+      "cpu_pct": 79.5,
+      "mem_pct": 81.2,
+      "error_rate": 0.34,
+      "latency_p99_ms": 4700.0
     },
     {
       "service": "auth-service",
-      "cpu_pct": 27.1,
-      "mem_pct": 40.5,
+      "cpu_pct": 24.8,
+      "mem_pct": 38.6,
       "error_rate": 0.01,
-      "latency_p99_ms": 130.0
+      "latency_p99_ms": 115.0
     }
   ],
   "alerts": [
@@ -50,7 +50,7 @@
       "alert_id": "A-2001",
       "service": "payment-service",
       "severity": "P1",
-      "message": "Checkout failure and timeout pattern above incident threshold",
+      "message": "payment-service DB connection pool exhausted and checkout failures >30%",
       "fired_at": "2026-03-30T11:02:16Z"
     }
   ],
@@ -62,5 +62,5 @@
     "severity": "P1",
     "red_herrings": []
   },
-  "max_steps": 5
+  "max_steps": 10
 }
