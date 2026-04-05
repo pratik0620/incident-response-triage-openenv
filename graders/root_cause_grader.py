@@ -1,27 +1,29 @@
+# Copyright (c) Meta Platforms, Inc. and affiliates.
+# All rights reserved.
+#
+# This source code is licensed under the BSD-style license found in the
+# LICENSE file in the root directory of this source tree.
+
 """
-Root Cause Grader — used when the agent takes an 'identify_cause' action.
+Root Cause Grader — standalone wrapper around Signal A.
 
-Scoring breakdown (max 1.0):
-  +0.5   Correct service name present in answer
-  +0.5   Cause-type keywords matched (proportional — partial credit allowed)
-  -0.3   Per red-herring service the agent incorrectly blames (clamped to 0)
+Kept as a separate file for backward compatibility with environment.py
+and any existing tests that import grade_root_cause directly.
 
-Design principles:
-  - Fully deterministic: same inputs always produce same score.
-  - No LLM calls: keyword/substring matching only.
-  - Case-insensitive throughout.
-  - Partial credit on keywords so agents that partially understand
-    the cause still score better than agents that guess randomly.
+Upgrade from v1:
+  - Now uses synonym expansion (get_cause_synonyms) so "heap overflow"
+    matches "memory_leak" without needing an exact keyword.
+  - Service matching accepts partial names (e.g. "payment" → "payment-service").
+  - Red-herring penalty is still -0.3 per service, clamped to 0.
+  - Scores are still in [0.0, 1.0], fully deterministic.
 """
 
 from __future__ import annotations
-
 from typing import TYPE_CHECKING
 
+from .signals import root_cause_signal
+
 if TYPE_CHECKING:
-    # GroundTruth is defined in models.py (same package root).
-    # We import only for type hints so there is no circular dependency
-    # when graders are imported before models in some test setups.
     from ..models import GroundTruth
 
 
@@ -36,30 +38,4 @@ def grade_root_cause(answer: str, ground_truth: "GroundTruth") -> float:
     Returns:
         float in [0.0, 1.0] — higher is better.
     """
-    if not answer or not answer.strip():
-        return 0.0
-
-    answer_lower = answer.lower()
-    score = 0.0
-
-    # ── 0.5 pts: correct service named ───────────────────────────────────────
-    if ground_truth.root_cause_service.lower() in answer_lower:
-        score += 0.5
-
-    # ── 0.5 pts: cause-type keywords (proportional partial credit) ────────────
-    # Split on underscores and spaces so "memory_leak" → ["memory", "leak"]
-    raw_cause = ground_truth.root_cause_type.lower().replace("_", " ")
-    cause_keywords = [w for w in raw_cause.split() if w]
-
-    if cause_keywords:
-        matched = sum(1 for kw in cause_keywords if kw in answer_lower)
-        score += 0.5 * (matched / len(cause_keywords))
-
-    # ── penalty: red herring services blamed ─────────────────────────────────
-    # Each red-herring service found in the answer deducts 0.3.
-    # Score is clamped to 0 — can never go negative.
-    for red_herring in ground_truth.red_herrings:
-        if red_herring.lower() in answer_lower:
-            score = max(0.0, score - 0.3)
-
-    return round(min(score, 1.0), 4)
+    return root_cause_signal(answer, ground_truth)
