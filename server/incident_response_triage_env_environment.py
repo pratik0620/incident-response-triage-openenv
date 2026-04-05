@@ -1,3 +1,9 @@
+# Copyright (c) Meta Platforms, Inc. and affiliates.
+# All rights reserved.
+#
+# This source code is licensed under the BSD-style license found in the
+# LICENSE file in the root directory of this source tree.
+
 from __future__ import annotations
 from uuid import uuid4
 
@@ -76,6 +82,16 @@ class IncidentResponseTriageEnvironment(Environment):
         answer_text = " ".join(
             part for part in [action.answer, action.reasoning] if part
         ).strip()
+
+        log_content = " ".join(
+            f"{l.service} {l.level} {l.message}"
+            for l in self.current_scenario.logs
+        )
+        log_content += " " + " ".join(
+            f"{a.service} {a.message}"
+            for a in self.current_scenario.alerts
+        )
+
         score = compute_final_score(
             action_type=action_type,
             answer=answer_text,
@@ -83,6 +99,7 @@ class IncidentResponseTriageEnvironment(Environment):
             steps_used=self._state.step,
             max_steps=self.current_scenario.max_steps,
             difficulty=self.current_scenario.difficulty,
+            log_content=log_content,
         )
 
         self._state.done = True
