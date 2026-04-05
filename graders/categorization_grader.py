@@ -1,37 +1,35 @@
 """
-Categorization Grader — used exclusively for the HARD task difficulty.
+Categorization Grader — used exclusively for HARD task difficulty.
 
-In the hard task, the agent must not only find the root cause but also
-classify what *kind* of failure it is:
+In the hard task, the agent must classify the failure type AND identify
+the root cause. This grader combines both requirements.
 
-    "real"         — a genuine, reproducible bug (e.g., OOM, crash loop)
-    "flaky"        — an intermittent failure not caused by code changes
-    "intermittent" — alias for "flaky" used by some scenarios
-    "env_specific" — failure only in a specific environment (staging, prod, etc.)
+Failure categories:
+    "real"         — genuine reproducible bug (OOM, crash loop, etc.)
+    "flaky"        — intermittent failure, not caused by code changes
+    "intermittent" — alias for "flaky"
+    "env_specific" — failure only in a specific environment
 
 Scoring breakdown (max 1.0):
-  +0.6   Correct failure category named in the answer
-  +0.2   Correct root-cause service named
-  +0.2   Root-cause type keywords matched (proportional partial credit)
+    +0.6   Correct failure category
+    +0.2   Correct root-cause service (via Signal A partial)
+    +0.2   Root-cause type keywords matched (via synonym expansion)
 
-Design notes:
-  - Category matching accepts both the underscore form ("env_specific") and
-    the spaced form ("env specific") to be robust to agent formatting choices.
-  - Root-cause sub-scores mirror root_cause_grader logic for consistency.
-  - Fully deterministic — no LLM calls.
-  - No red-herring penalty here; the category scoring already penalises
-    agents that pick the wrong category (they get 0.0 on the 0.6 block).
+Upgrade from v1:
+    - Category matching still accepts underscore and spaced forms.
+    - "flaky"/"intermittent" are treated as aliases.
+    - Root-cause matching now uses synonym expansion (same as root_cause_grader).
+    - Scores still in [0.0, 1.0], fully deterministic.
 """
 
 from __future__ import annotations
-
 from typing import TYPE_CHECKING
+
+from .synonyms import get_cause_synonyms
 
 if TYPE_CHECKING:
     from ..models import GroundTruth
 
-# The only valid failure categories.  Any value outside this set in
-# ground_truth.failure_category is a data error, not a grader error.
 VALID_CATEGORIES = {"real", "flaky", "intermittent", "env_specific"}
 
 
@@ -41,8 +39,7 @@ def grade_categorization(answer: str, ground_truth: "GroundTruth") -> float:
 
     Args:
         answer:       The agent's free-text response.
-        ground_truth: A GroundTruth instance for the current scenario.
-                      Must have a non-empty `failure_category` field.
+        ground_truth: A GroundTruth instance. Must have failure_category set.
 
     Returns:
         float in [0.0, 1.0] — higher is better.
@@ -54,26 +51,35 @@ def grade_categorization(answer: str, ground_truth: "GroundTruth") -> float:
     score = 0.0
 
     # ── 0.6 pts: correct failure category ────────────────────────────────────
-    # We accept both "env_specific" (underscore) and "env specific" (spaced).
-    category = ground_truth.failure_category.lower()           # e.g. "env_specific"
-    category_spaced = category.replace("_", " ")               # e.g. "env specific"
+    category = ground_truth.failure_category.lower()
+    category_spaced = category.replace("_", " ")
 
     if category in {"flaky", "intermittent"}:
+        # Both terms are valid answers for this category
         if "flaky" in answer_lower or "intermittent" in answer_lower:
             score += 0.6
     elif category in answer_lower or category_spaced in answer_lower:
         score += 0.6
 
     # ── 0.2 pts: correct service named ───────────────────────────────────────
-    if ground_truth.root_cause_service.lower() in answer_lower:
+    service = ground_truth.root_cause_service.lower()
+    service_parts = [
+        p for p in service.replace("-", " ").replace("_", " ").split()
+        if len(p) > 3
+    ]
+    if service in answer_lower or any(p in answer_lower for p in service_parts):
         score += 0.2
 
-    # ── 0.2 pts: cause-type keywords (proportional partial credit) ────────────
-    raw_cause = ground_truth.root_cause_type.lower().replace("_", " ")
-    cause_keywords = [w for w in raw_cause.split() if w]
+    # ── 0.2 pts: cause-type keywords (proportional, with synonym expansion) ───
+    all_cause_terms = get_cause_synonyms(ground_truth.root_cause_type)
+    phrase_hits = sum(1 for t in all_cause_terms if " " in t and t in answer_lower)
+    word_hits   = sum(1 for t in all_cause_terms if " " not in t and t in answer_lower)
 
-    if cause_keywords:
-        matched = sum(1 for kw in cause_keywords if kw in answer_lower)
-        score += 0.2 * (matched / len(cause_keywords))
+    if phrase_hits >= 1:
+        score += 0.2
+    elif word_hits >= 2:
+        score += 0.15
+    elif word_hits == 1:
+        score += 0.08
 
     return round(min(score, 1.0), 4)

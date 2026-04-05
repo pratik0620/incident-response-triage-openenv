@@ -1,38 +1,29 @@
 """
-Fix Grader — used when the agent takes a 'propose_fix' action.
+Fix Grader — standalone wrapper around Signal B.
 
-Scoring breakdown (max 1.0):
-  score = (number of fix-keywords found in answer) / (total fix-keywords)
+Kept as a separate file for backward compatibility with environment.py
+and any existing tests that import grade_fix directly.
 
-Key design decisions:
-  - Only words longer than 4 characters are used as keywords.
-    Short words ("the", "and", "with", "set") are filler that appear
-    in almost any answer and would inflate scores artificially.
-  - Matching is case-insensitive substring-based.
-  - Fully deterministic — no LLM calls.
-  - Partial credit: finding 3 out of 5 fix concepts scores 0.6.
-
-Note: In composite_grader, this score is weighted 0.6 and combined with
-      0.4 × root_cause_score when action_type == 'propose_fix', because
-      a fix that correctly names the cause AND the remedy is worth more
-      than one that only names the remedy.
+Upgrade from v1:
+  - Now uses tiered scoring (0.3 / 0.7 / 1.0) instead of flat keyword overlap.
+  - "Restart the service" now correctly scores low (~0.3) not high.
+  - Cause keywords are no longer filtered from fix keywords — that caused
+    false negatives when a good fix naturally restates the cause.
+  - Scores still in [0.0, 1.0], fully deterministic.
 """
 
 from __future__ import annotations
-
 from typing import TYPE_CHECKING
+
+from .signals import fix_quality_signal
 
 if TYPE_CHECKING:
     from ..models import GroundTruth
 
-# Minimum character length for a word to count as a meaningful keyword.
-# Words <= this length are considered filler and are skipped.
-_MIN_KEYWORD_LENGTH = 4
-
 
 def grade_fix(answer: str, ground_truth: "GroundTruth") -> float:
     """
-    Score whether the proposed fix is correct.
+    Score whether the proposed fix is correct and complete.
 
     Args:
         answer:       The agent's free-text fix proposal.
@@ -41,28 +32,4 @@ def grade_fix(answer: str, ground_truth: "GroundTruth") -> float:
     Returns:
         float in [0.0, 1.0] — higher is better.
     """
-    if not answer or not answer.strip():
-        return 0.0
-
-    answer_lower = answer.lower()
-
-    # Extract meaningful keywords from the expected fix string.
-    # We split on whitespace and filter out short/filler words.
-    fix_keywords = [
-        word
-        for word in ground_truth.correct_fix.lower().split()
-        if len(word) > _MIN_KEYWORD_LENGTH
-    ]
-
-    # Avoid giving fix credit for words that only describe the root cause.
-    raw_cause = ground_truth.root_cause_type.lower().replace("_", " ")
-    cause_keywords = {w for w in raw_cause.split() if w}
-    fix_keywords = [kw for kw in fix_keywords if kw not in cause_keywords]
-
-    # Guard: if the correct_fix has no meaningful keywords (very short phrase),
-    # we cannot evaluate — return 0.0 to avoid dividing by zero.
-    if not fix_keywords:
-        return 0.0
-
-    matched = sum(1 for kw in fix_keywords if kw in answer_lower)
-    return round(matched / len(fix_keywords), 4)
+    return fix_quality_signal(answer, ground_truth)
