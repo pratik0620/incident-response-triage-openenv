@@ -7,36 +7,36 @@
     {
       "timestamp": "2026-03-30T16:03:41Z",
       "service": "auth-service",
-      "message": "Periodic key metadata refresh attempts timing out in one auth instance",
+      "message": "JWKS refresh failed: timeout fetching new key set from issuer",
       "level": "ERROR"
     },
     {
       "timestamp": "2026-03-30T16:03:43Z",
       "service": "auth-service",
-      "message": "Intermittent token signature mismatches observed after recent key rotation",
+      "message": "Token validation failed: stale JWKS cache still using old key id",
       "level": "ERROR"
     },
     {
       "timestamp": "2026-03-30T16:03:44Z",
       "service": "payment-service",
-      "message": "Upstream authorization responses became inconsistent across repeated requests",
+      "message": "Authorization dependency returned intermittent 401 responses",
       "level": "WARN"
     }
   ],
   "metrics": [
     {
       "service": "auth-service",
-      "cpu_pct": 39.7,
-      "mem_pct": 47.8,
-      "error_rate": 0.15,
-      "latency_p99_ms": 640.0
+      "cpu_pct": 71.3,
+      "mem_pct": 76.5,
+      "error_rate": 0.29,
+      "latency_p99_ms": 1700.0
     },
     {
       "service": "payment-service",
-      "cpu_pct": 44.2,
-      "mem_pct": 58.1,
-      "error_rate": 0.09,
-      "latency_p99_ms": 520.0
+      "cpu_pct": 41.0,
+      "mem_pct": 55.7,
+      "error_rate": 0.03,
+      "latency_p99_ms": 240.0
     }
   ],
   "alerts": [
@@ -44,7 +44,7 @@
       "alert_id": "A-5001",
       "service": "auth-service",
       "severity": "P2",
-      "message": "Authentication validation failures and retries trending above baseline",
+      "message": "auth-service using stale JWKS cache after key rotation",
       "fired_at": "2026-03-30T16:03:45Z"
     }
   ],
@@ -54,9 +54,7 @@
     "correct_fix": "kubectl rollout restart deploy/auth-service",
     "failure_category": "intermittent",
     "severity": "P2",
-    "red_herrings": [
-      "payment-service"
-    ]
+    "red_herrings": []
   },
-  "max_steps": 5
+  "max_steps": 10
 }

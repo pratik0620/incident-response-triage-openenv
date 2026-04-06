@@ -1,0 +1,108 @@
+{
+  "scenario_id": "medium_003",
+  "difficulty": "medium",
+  "title": "Database replication lag triggers search failures",
+  "description": "Search service relies on database replicas which fall behind on writes, causing stale data responses and timeouts.",
+  "logs": [
+    {
+      "timestamp": "2026-03-31T14:35:20Z",
+      "service": "search-service",
+      "message": "Database replica query latency increased from 45ms to 3200ms",
+      "level": "WARN"
+    },
+    {
+      "timestamp": "2026-03-31T14:35:23Z",
+      "service": "search-service",
+      "message": "Detected replication lag >2000ms on read replica: queries timing out after 5s",
+      "level": "ERROR"
+    },
+    {
+      "timestamp": "2026-03-31T14:35:26Z",
+      "service": "search-service",
+      "message": "Fallback to primary database failing due to connection pool saturation",
+      "level": "ERROR"
+    },
+    {
+      "timestamp": "2026-03-31T14:35:30Z",
+      "service": "catalog-service",
+      "message": "Search service dependency returning timeouts on 41% of requests",
+      "level": "ERROR"
+    },
+    {
+      "timestamp": "2026-03-31T14:35:33Z",
+      "service": "api-gateway",
+      "message": "GET /search returned 504: search-service timeout after 6000ms",
+      "level": "ERROR"
+    },
+    {
+      "timestamp": "2026-03-31T14:35:36Z",
+      "service": "metrics-collector",
+      "message": "Metrics scrape from search-service delayed due to high cardinality",
+      "level": "WARN"
+    }
+  ],
+  "metrics": [
+    {
+      "service": "search-service",
+      "cpu_pct": 71.8,
+      "mem_pct": 74.3,
+      "error_rate": 0.39,
+      "latency_p99_ms": 6100.0
+    },
+    {
+      "service": "catalog-service",
+      "cpu_pct": 59.2,
+      "mem_pct": 67.1,
+      "error_rate": 0.22,
+      "latency_p99_ms": 4700.0
+    },
+    {
+      "service": "api-gateway",
+      "cpu_pct": 54.6,
+      "mem_pct": 60.8,
+      "error_rate": 0.18,
+      "latency_p99_ms": 3900.0
+    },
+    {
+      "service": "metrics-collector",
+      "cpu_pct": 42.1,
+      "mem_pct": 58.3,
+      "error_rate": 0.01,
+      "latency_p99_ms": 520.0
+    }
+  ],
+  "alerts": [
+    {
+      "alert_id": "A-M003-1",
+      "service": "search-service",
+      "severity": "P1",
+      "message": "Search service latency spike and high error rate indicating data access issues",
+      "fired_at": "2026-03-31T14:35:24Z"
+    },
+    {
+      "alert_id": "A-M003-2",
+      "service": "catalog-service",
+      "severity": "P2",
+      "message": "Catalog service error rate elevated due to search dependency timeouts",
+      "fired_at": "2026-03-31T14:35:31Z"
+    },
+    {
+      "alert_id": "A-M003-3",
+      "service": "metrics-collector",
+      "severity": "P3",
+      "message": "Metrics collection latency trending upward",
+      "fired_at": "2026-03-31T14:35:37Z"
+    }
+  ],
+  "ground_truth": {
+    "root_cause_service": "search-service",
+    "root_cause_type": "database_replication_lag",
+    "correct_fix": "Check MySQL replication status: SHOW SLAVE STATUS; investigate write-heavy workload on primary; consider scaling replica or adjusting read preferences",
+    "failure_category": "real",
+    "severity": "P1",
+    "red_herrings": [
+      "metrics-collector"
+    ]
+  },
+  "max_steps": 15
+}

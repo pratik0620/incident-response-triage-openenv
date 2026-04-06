@@ -1,0 +1,108 @@
+{
+  "scenario_id": "medium_004",
+  "difficulty": "medium",
+  "title": "Auth service key validation delay breaks payment processing",
+  "description": "Auth service experiences latency in JWKS key fetching, causing payment-service validation to timeout and API gateway to fail.",
+  "logs": [
+    {
+      "timestamp": "2026-03-31T16:10:45Z",
+      "service": "auth-service",
+      "message": "JWKS endpoint latency increased from 120ms to 2800ms",
+      "level": "WARN"
+    },
+    {
+      "timestamp": "2026-03-31T16:10:48Z",
+      "service": "auth-service",
+      "message": "Key validation cache hit rate dropped to 12% due to token rotation frequency",
+      "level": "WARN"
+    },
+    {
+      "timestamp": "2026-03-31T16:10:52Z",
+      "service": "payment-service",
+      "message": "Auth service validation calls timing out: waiting >3000ms for JWKS verification",
+      "level": "ERROR"
+    },
+    {
+      "timestamp": "2026-03-31T16:10:55Z",
+      "service": "payment-service",
+      "message": "Request queuing detected: unable to progress transaction validations",
+      "level": "ERROR"
+    },
+    {
+      "timestamp": "2026-03-31T16:10:59Z",
+      "service": "api-gateway",
+      "message": "POST /charge returned 503: payment-service saturated waiting on auth verification",
+      "level": "ERROR"
+    },
+    {
+      "timestamp": "2026-03-31T16:11:02Z",
+      "service": "notification-service",
+      "message": "Email queue processing rate slightly elevated",
+      "level": "INFO"
+    }
+  ],
+  "metrics": [
+    {
+      "service": "auth-service",
+      "cpu_pct": 68.4,
+      "mem_pct": 61.9,
+      "error_rate": 0.08,
+      "latency_p99_ms": 4200.0
+    },
+    {
+      "service": "payment-service",
+      "cpu_pct": 74.2,
+      "mem_pct": 76.7,
+      "error_rate": 0.32,
+      "latency_p99_ms": 5800.0
+    },
+    {
+      "service": "api-gateway",
+      "cpu_pct": 61.5,
+      "mem_pct": 59.3,
+      "error_rate": 0.24,
+      "latency_p99_ms": 4100.0
+    },
+    {
+      "service": "notification-service",
+      "cpu_pct": 35.7,
+      "mem_pct": 52.1,
+      "error_rate": 0.01,
+      "latency_p99_ms": 340.0
+    }
+  ],
+  "alerts": [
+    {
+      "alert_id": "A-M004-1",
+      "service": "auth-service",
+      "severity": "P1",
+      "message": "Auth service latency spike on key validation operations",
+      "fired_at": "2026-03-31T16:10:49Z"
+    },
+    {
+      "alert_id": "A-M004-2",
+      "service": "payment-service",
+      "severity": "P2",
+      "message": "Payment service error rate elevated with upstream auth timeouts",
+      "fired_at": "2026-03-31T16:10:56Z"
+    },
+    {
+      "alert_id": "A-M004-3",
+      "service": "notification-service",
+      "severity": "P3",
+      "message": "Notification service queue processing rate increased",
+      "fired_at": "2026-03-31T16:11:03Z"
+    }
+  ],
+  "ground_truth": {
+    "root_cause_service": "auth-service",
+    "root_cause_type": "jwks_cache_invalidation_loop",
+    "correct_fix": "Increase JWKS cache TTL and add circuit breaker; kubectl set env deploy/auth-service JWKS_CACHE_TTL=600 JWKS_FETCH_TIMEOUT=500",
+    "failure_category": "intermittent",
+    "severity": "P1",
+    "red_herrings": [
+      "notification-service"
+    ]
+  },
+  "max_steps": 15
+}

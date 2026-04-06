@@ -1,0 +1,185 @@
+{
+  "scenario_id": "hard_001",
+  "difficulty": "hard",
+  "title": "Catalog service memory bloat cascades through search system",
+  "description": "Catalog service has gradual memory leak causing GC pauses, leading to search timeouts and eventual API gateway degradation across multiple request types.",
+  "logs": [
+    {
+      "timestamp": "2026-04-01T08:10:00Z",
+      "service": "catalog-service",
+      "message": "GC pause detected: 1.2s major collection cycle completed",
+      "level": "WARN"
+    },
+    {
+      "timestamp": "2026-04-01T08:10:05Z",
+      "service": "catalog-service",
+      "message": "Service restart initiated by replication sync: caught up to offset 45322",
+      "level": "INFO"
+    },
+    {
+      "timestamp": "2026-04-01T08:10:15Z",
+      "service": "catalog-service",
+      "message": "Response latency p50=45ms p95=320ms p99=2100ms over last 5 minutes",
+      "level": "INFO"
+    },
+    {
+      "timestamp": "2026-04-01T08:10:22Z",
+      "service": "search-service",
+      "message": "Upstream catalog-service latency exceeded 1500ms on 18% of product queries",
+      "level": "WARN"
+    },
+    {
+      "timestamp": "2026-04-01T08:10:25Z",
+      "service": "search-service",
+      "message": "Query timeout on secondary catalog shard: retrying on primary",
+      "level": "WARN"
+    },
+    {
+      "timestamp": "2026-04-01T08:10:30Z",
+      "service": "search-service",
+      "message": "Circuit breaker state: HALF_OPEN after 6 failures in 30s window",
+      "level": "ERROR"
+    },
+    {
+      "timestamp": "2026-04-01T08:10:35Z",
+      "service": "inventory-service",
+      "message": "Stock sync from catalog-service receiving intermittent 503 responses",
+      "level": "WARN"
+    },
+    {
+      "timestamp": "2026-04-01T08:10:40Z",
+      "service": "api-gateway",
+      "message": "GET /products returned 503 (Service Unavailable): search-service circuit breaker open",
+      "level": "ERROR"
+    },
+    {
+      "timestamp": "2026-04-01T08:10:45Z",
+      "service": "api-gateway",
+      "message": "PUT /products/:id returned 200 OK: cached catalog data served",
+      "level": "INFO"
+    },
+    {
+      "timestamp": "2026-04-01T08:10:50Z",
+      "service": "cdn-cache",
+      "message": "Cache miss rate increased to 22% from baseline 8%",
+      "level": "WARN"
+    },
+    {
+      "timestamp": "2026-04-01T08:10:55Z",
+      "service": "cdn-cache",
+      "message": "Invalidation backlog: 340 pending requests",
+      "level": "WARN"
+    },
+    {
+      "timestamp": "2026-04-01T08:11:00Z",
+      "service": "test-runner",
+      "message": "Flaky test detected: TestCatalogIntegration_v3 failed 2/5 runs",
+      "level": "WARN"
+    },
+    {
+      "timestamp": "2026-04-01T08:11:05Z",
+      "service": "catalog-service",
+      "message": "GC pause detected: 2.1s major collection cycle, heap at 78% utilization",
+      "level": "WARN"
+    },
+    {
+      "timestamp": "2026-04-01T08:11:10Z",
+      "service": "catalog-service",
+      "message": "Request processing rate: 680 req/s (baseline 750 req/s), 8.5% reduction",
+      "level": "INFO"
+    }
+  ],
+  "metrics": [
+    {
+      "service": "catalog-service",
+      "cpu_pct": 61.3,
+      "mem_pct": 82.1,
+      "error_rate": 0.07,
+      "latency_p99_ms": 2340.0
+    },
+    {
+      "service": "search-service",
+      "cpu_pct": 58.7,
+      "mem_pct": 71.4,
+      "error_rate": 0.23,
+      "latency_p99_ms": 4100.0
+    },
+    {
+      "service": "inventory-service",
+      "cpu_pct": 44.2,
+      "mem_pct": 62.8,
+      "error_rate": 0.12,
+      "latency_p99_ms": 3200.0
+    },
+    {
+      "service": "api-gateway",
+      "cpu_pct": 52.6,
+      "mem_pct": 58.3,
+      "error_rate": 0.18,
+      "latency_p99_ms": 2800.0
+    },
+    {
+      "service": "cdn-cache",
+      "cpu_pct": 39.1,
+      "mem_pct": 66.7,
+      "error_rate": 0.03,
+      "latency_p99_ms": 450.0
+    },
+    {
+      "service": "test-runner",
+      "cpu_pct": 71.2,
+      "mem_pct": 48.9,
+      "error_rate": 0.04,
+      "latency_p99_ms": 8200.0
+    }
+  ],
+  "alerts": [
+    {
+      "alert_id": "A-H001-1",
+      "service": "catalog-service",
+      "severity": "P1",
+      "message": "Catalog service GC pause duration trending upward with increasing memory utilization",
+      "fired_at": "2026-04-01T08:10:06Z"
+    },
+    {
+      "alert_id": "A-H001-2",
+      "service": "search-service",
+      "severity": "P2",
+      "message": "Search service circuit breaker open: downstream catalog timeout threshold exceeded",
+      "fired_at": "2026-04-01T08:10:31Z"
+    },
+    {
+      "alert_id": "A-H001-3",
+      "service": "api-gateway",
+      "severity": "P2",
+      "message": "API gateway 503 rate at 18% due to upstream service unavailability",
+      "fired_at": "2026-04-01T08:10:41Z"
+    },
+    {
+      "alert_id": "A-H001-4",
+      "service": "cdn-cache",
+      "severity": "P3",
+      "message": "CDN cache miss rate spike and invalidation queue growing",
+      "fired_at": "2026-04-01T08:10:56Z"
+    },
+    {
+      "alert_id": "A-H001-5",
+      "service": "test-runner",
+      "severity": "P3",
+      "message": "Test flakiness detected in integration suite",
+      "fired_at": "2026-04-01T08:11:01Z"
+    }
+  ],
+  "ground_truth": {
+    "root_cause_service": "catalog-service",
+    "root_cause_type": "memory_leak_gc_overhead",
+    "correct_fix": "Enable heap profiling: jcmd <pid> GC.heap_info; identify retained objects; apply GC tuning: -XX:+UseG1GC -XX:MaxGCPauseMillis=200; redeploy with patch",
+    "failure_category": "flaky",
+    "severity": "P1",
+    "red_herrings": [
+      "cdn-cache",
+      "test-runner"
+    ]
+  },
+  "max_steps": 20
+}
