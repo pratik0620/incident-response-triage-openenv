@@ -6,7 +6,6 @@ colorTo: yellow
 sdk: docker
 pinned: false
 app_port: 8000
-base_path: /web
 tags:
   - openenv
   - incident-response
@@ -15,7 +14,7 @@ tags:
   - reinforcement-learning
 ---
 
-# Incident Response Triage Env Environment
+# Incident Response Triage Environment
 An OpenEnv reinforcement learning environment where AI agents diagnose real-world production incidents. The agent reads logs, metrics, and alerts from a simulated microservice system and must identify the root cause, propose a fix, and do so efficiently within a step budget.
 
 ## Environment overview
@@ -67,3 +66,10 @@ Scores are computed by a 6-signal grader:
 
 Investigative steps cost -0.02 reward each. Escalating returns a flat 0.2.
 
+## Running the environment
+
+The environment is deployed as a Hugging Face Space.
+
+Base URL: https://pratik234567-incident-response-triage-env.hf.space
+
+Example reset request: curl -X POST https://pratik234567-incident-response-triage-env.hf.space/reset
