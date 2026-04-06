@@ -1,66 +1,86 @@
 {
-  "scenario_id": "scenario_002",
+  "scenario_id": "easy_002",
   "difficulty": "easy",
-  "title": "Intermittent checkout failures",
-  "description": "A subset of checkout calls fail while auth and gateway look mostly healthy.",
+  "title": "Order service out of memory kill",
+  "description": "The order service is crashing repeatedly. Users cannot place new orders.",
+  "max_steps": 10,
   "logs": [
     {
-      "timestamp": "2026-03-30T11:02:10Z",
+      "timestamp": "2026-04-01T11:02:10Z",
+      "service": "order-service",
+      "level": "WARN",
+      "message": "Heap usage at 89% — GC running continuously"
+    },
+    {
+      "timestamp": "2026-04-01T11:02:45Z",
+      "service": "order-service",
+      "level": "FATAL",
+      "message": "Killed: Out of memory — container exceeded memory limit of 512Mi"
+    },
+    {
+      "timestamp": "2026-04-01T11:02:46Z",
+      "service": "order-service",
+      "level": "INFO",
+      "message": "Container restarting (CrashLoopBackOff restart #3)"
+    },
+    {
+      "timestamp": "2026-04-01T11:02:47Z",
       "service": "api-gateway",
-      "message": "POST /charge returned 502 because payment-service timed out",
-      "level": "ERROR"
+      "level": "ERROR",
+      "message": "POST /orders 503 Service Unavailable — order-service unreachable"
     },
     {
-      "timestamp": "2026-03-30T11:02:12Z",
-      "service": "payment-service",
-      "message": "Failed to acquire DB connection: timeout after 5000ms",
-      "level": "ERROR"
-    },
-    {
-      "timestamp": "2026-03-30T11:02:13Z",
-      "service": "payment-service",
-      "message": "Connection pool exhausted: max_connections=12 active=12 waiting=37",
-      "level": "WARN"
-    },
-    {
-      "timestamp": "2026-03-30T11:02:15Z",
+      "timestamp": "2026-04-01T11:02:50Z",
       "service": "auth-service",
-      "message": "Auth checks healthy: token verification succeeded",
-      "level": "DEBUG"
+      "level": "INFO",
+      "message": "Token validation healthy: p99=18ms"
     }
   ],
   "metrics": [
     {
-      "service": "payment-service",
-      "cpu_pct": 79.5,
-      "mem_pct": 81.2,
-      "error_rate": 0.34,
-      "latency_p99_ms": 4700.0
+      "service": "order-service",
+      "cpu_pct": 95.2,
+      "mem_pct": 99.8,
+      "error_rate": 4.1,
+      "latency_p99_ms": 0.0
+    },
+    {
+      "service": "api-gateway",
+      "cpu_pct": 22.1,
+      "mem_pct": 41.3,
+      "error_rate": 3.8,
+      "latency_p99_ms": 520.0
     },
     {
       "service": "auth-service",
-      "cpu_pct": 24.8,
-      "mem_pct": 38.6,
-      "error_rate": 0.01,
-      "latency_p99_ms": 115.0
+      "cpu_pct": 12.4,
+      "mem_pct": 29.1,
+      "error_rate": 0.0,
+      "latency_p99_ms": 18.0
     }
   ],
   "alerts": [
     {
       "alert_id": "A-2001",
-      "service": "payment-service",
+      "service": "order-service",
       "severity": "P1",
-      "message": "payment-service DB connection pool exhausted and checkout failures >30%",
-      "fired_at": "2026-03-30T11:02:16Z"
+      "message": "order-service CrashLoopBackOff — OOM kill detected, pod restarting",
+      "fired_at": "2026-04-01T11:02:47Z"
+    },
+    {
+      "alert_id": "A-2002",
+      "service": "api-gateway",
+      "severity": "P2",
+      "message": "POST /orders error rate above 3/s — order-service unreachable",
+      "fired_at": "2026-04-01T11:02:50Z"
     }
   ],
   "ground_truth": {
-    "root_cause_service": "payment-service",
-    "root_cause_type": "db_connection_pool_exhaustion",
-    "correct_fix": "kubectl rollout restart deploy/payment-service",
+    "root_cause_service": "order-service",
+    "root_cause_type": "memory_leak",
+    "correct_fix": "Increase the memory limit for order-service from 512Mi to at least 1Gi in the deployment manifest. Profile the heap to find the leaking object — check for unbounded caches or large object accumulation. Add a liveness probe so Kubernetes restarts the pod automatically if memory exceeds threshold. Investigate recent code changes for memory leaks.",
     "failure_category": "real",
     "severity": "P1",
     "red_herrings": []
-  },
-  "max_steps": 10
+  }
 }

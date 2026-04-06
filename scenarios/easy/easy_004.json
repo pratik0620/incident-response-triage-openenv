@@ -51,7 +51,7 @@
   "ground_truth": {
     "root_cause_service": "notification-worker",
     "root_cause_type": "worker_rate_limit_misconfiguration",
-    "correct_fix": "kubectl set env deploy/notification-worker WORKER_RATE_LIMIT=50",
+    "correct_fix": "Increase the WORKER_RATE_LIMIT environment variable in the notification-worker deployment to match current queue throughput requirements. The current limit is too low for the message volume. Update the config, redeploy, and monitor drain rate. Add an alert on queue backlog depth to detect this automatically in future.",
     "failure_category": "env_specific",
     "severity": "P3",
     "red_herrings": []

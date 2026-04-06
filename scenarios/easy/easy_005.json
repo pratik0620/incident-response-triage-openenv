@@ -51,7 +51,7 @@
   "ground_truth": {
     "root_cause_service": "auth-service",
     "root_cause_type": "stale_jwks_cache",
-    "correct_fix": "kubectl rollout restart deploy/auth-service",
+    "correct_fix": "Force a JWKS cache refresh on the stale auth-service pod by invalidating the cache and restarting the pod. Reduce the JWKS cache TTL so keys are fetched more frequently after rotations. Add a background refresh job that proactively fetches new keys instead of waiting for cache expiry. Monitor for signature mismatch errors after future key rotations.",
     "failure_category": "intermittent",
     "severity": "P2",
     "red_herrings": []

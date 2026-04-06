@@ -51,7 +51,7 @@
   "ground_truth": {
     "root_cause_service": "catalog-service",
     "root_cause_type": "cache_warmup_failed",
-    "correct_fix": "kubectl rollout restart deploy/catalog-service",
+    "correct_fix": "Manually trigger the cache warmup job to repopulate the catalog cache. Investigate why the scheduled warmup failed — check job logs for errors. Add a startup check that preloads the cache on pod initialization. Set up an alert for cache hit rate dropping below 80% to detect this earlier.",
     "failure_category": "real",
     "severity": "P2",
     "red_herrings": []

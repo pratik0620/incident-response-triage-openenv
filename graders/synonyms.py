@@ -93,6 +93,46 @@ CAUSE_SYNONYMS: Dict[str, List[str]] = {
         "rate limit", "worker limit", "throughput limit", "misconfiguration",
         "wrong config", "rate config",
     ],
+    "database_query_performance_degradation": [
+        "slow query", "query timeout", "missing index", "full table scan",
+        "query performance", "db slow", "database latency", "index missing",
+    ],
+    "database_replication_lag": [
+        "replication lag", "replica lag", "slave lag", "replication delay",
+        "replica behind", "replication latency",
+    ],
+    "database_connection_leak": [
+        "connection leak", "db leak", "connection not closed", "leaked connection",
+        "connection exhausted", "pool leak", "unclosed connection",
+    ],
+    "jwks_cache_invalidation_loop": [
+        "jwks", "cache invalidation", "jwt key", "key refresh loop",
+        "token key", "signing key", "cache thrash",
+    ],
+    "worker_pool_saturation": [
+        "worker pool", "worker saturation", "thread pool", "pool exhausted",
+        "worker exhausted", "concurrency limit", "worker queue full",
+    ],
+    "memory_leak_gc_overhead": [
+        "memory leak", "gc overhead", "heap", "oom", "out of memory",
+        "garbage collection", "memory growth", "heap exhaustion",
+    ],
+    "unbounded_token_cache_growth": [
+        "cache growth", "unbounded cache", "cache leak", "token cache",
+        "memory growth", "cache eviction", "cache size",
+    ],
+    "event_stream_consumer_lag": [
+        "consumer lag", "kafka lag", "stream lag", "event lag",
+        "consumer behind", "stream consumer", "offset lag",
+    ],
+    "network_partition_control_plane": [
+        "network partition", "control plane", "istiod", "service mesh",
+        "network split", "connectivity", "control plane failure",
+    ],
+    "config_max_batch_size_mismatch": [
+        "batch size", "config mismatch", "batch mismatch", "misconfiguration",
+        "wrong batch", "batch config", "batch limit",
+    ],
 }
 
 # ─────────────────────────────────────────────────────────────────────────────
@@ -181,6 +221,56 @@ FIX_TIERS: Dict[str, Dict[str, List[str]]] = {
                    "increase", "adjust"],
         "tier_3": ["config validation", "monitor", "alert", "canary",
                    "rate limit policy"],
+    },
+    "database_query_performance_degradation": {
+        "tier_1": ["restart", "redeploy"],
+        "tier_2": ["index", "query", "analyze", "explain", "slow query"],
+        "tier_3": ["index", "monitor", "alert", "query plan", "performance"],
+    },
+    "database_replication_lag": {
+        "tier_1": ["restart", "redeploy"],
+        "tier_2": ["replication", "replica", "parallel", "lag", "binlog"],
+        "tier_3": ["parallel replication", "monitor", "alert", "replica", "lag"],
+    },
+    "database_connection_leak": {
+        "tier_1": ["restart", "redeploy"],
+        "tier_2": ["connection", "leak", "close", "finally", "context manager"],
+        "tier_3": ["leak detection", "monitor", "alert", "pool", "connection"],
+    },
+    "jwks_cache_invalidation_loop": {
+        "tier_1": ["restart", "redeploy"],
+        "tier_2": ["ttl", "cache", "refresh", "interval", "invalidation"],
+        "tier_3": ["background refresh", "monitor", "alert", "ttl", "interval"],
+    },
+    "worker_pool_saturation": {
+        "tier_1": ["restart", "redeploy"],
+        "tier_2": ["worker", "concurrency", "scale", "increase", "pool"],
+        "tier_3": ["autoscal", "monitor", "alert", "queue", "concurrency"],
+    },
+    "memory_leak_gc_overhead": {
+        "tier_1": ["restart", "redeploy"],
+        "tier_2": ["heap", "profil", "eviction", "gc", "memory limit"],
+        "tier_3": ["profil", "monitor", "alert", "eviction", "bounded"],
+    },
+    "unbounded_token_cache_growth": {
+        "tier_1": ["restart", "redeploy"],
+        "tier_2": ["eviction", "max size", "ttl", "cache", "bounded"],
+        "tier_3": ["eviction policy", "monitor", "alert", "ttl", "max size"],
+    },
+    "event_stream_consumer_lag": {
+        "tier_1": ["restart", "redeploy"],
+        "tier_2": ["consumer", "thread", "partition", "scale", "lag"],
+        "tier_3": ["autoscal", "monitor", "alert", "consumer", "partition"],
+    },
+    "network_partition_control_plane": {
+        "tier_1": ["restart", "redeploy"],
+        "tier_2": ["firewall", "acl", "network", "revert", "connectivity"],
+        "tier_3": ["firewall", "monitor", "alert", "acl", "network policy"],
+    },
+    "config_max_batch_size_mismatch": {
+        "tier_1": ["restart", "redeploy"],
+        "tier_2": ["batch size", "config", "increase", "match", "adjust"],
+        "tier_3": ["validation", "monitor", "alert", "config", "staging"],
     },
 }
 
