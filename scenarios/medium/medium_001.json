@@ -1,0 +1,108 @@
+{
+  "scenario_id": "medium_001",
+  "difficulty": "medium",
+  "title": "Payment service degradation cascades to order service",
+  "description": "Payment service experiences latency issues, causing order service to timeout on payment calls, and API gateway to return 503 errors.",
+  "logs": [
+    {
+      "timestamp": "2026-03-31T10:05:00Z",
+      "service": "payment-service",
+      "message": "Query execution time exceeded 2000ms for transaction lookups",
+      "level": "WARN"
+    },
+    {
+      "timestamp": "2026-03-31T10:05:02Z",
+      "service": "payment-service",
+      "message": "Thread pool utilization at 87%: processing payment requests slower than intake",
+      "level": "WARN"
+    },
+    {
+      "timestamp": "2026-03-31T10:05:05Z",
+      "service": "order-service",
+      "message": "Timeout calling payment-service: requests taking >5000ms to complete",
+      "level": "ERROR"
+    },
+    {
+      "timestamp": "2026-03-31T10:05:07Z",
+      "service": "order-service",
+      "message": "Retry attempts exhausted after 3 failed payment validations",
+      "level": "ERROR"
+    },
+    {
+      "timestamp": "2026-03-31T10:05:10Z",
+      "service": "api-gateway",
+      "message": "POST /orders returned 503: order-service unavailable after payment timeouts",
+      "level": "ERROR"
+    },
+    {
+      "timestamp": "2026-03-31T10:05:12Z",
+      "service": "redis-cache",
+      "message": "Cache eviction policy triggered due to increased key churn",
+      "level": "WARN"
+    }
+  ],
+  "metrics": [
+    {
+      "service": "payment-service",
+      "cpu_pct": 76.4,
+      "mem_pct": 68.7,
+      "error_rate": 0.16,
+      "latency_p99_ms": 4850.0
+    },
+    {
+      "service": "order-service",
+      "cpu_pct": 61.2,
+      "mem_pct": 72.3,
+      "error_rate": 0.27,
+      "latency_p99_ms": 5200.0
+    },
+    {
+      "service": "api-gateway",
+      "cpu_pct": 52.1,
+      "mem_pct": 58.9,
+      "error_rate": 0.19,
+      "latency_p99_ms": 3100.0
+    },
+    {
+      "service": "redis-cache",
+      "cpu_pct": 48.3,
+      "mem_pct": 81.5,
+      "error_rate": 0.03,
+      "latency_p99_ms": 240.0
+    }
+  ],
+  "alerts": [
+    {
+      "alert_id": "A-M001-1",
+      "service": "payment-service",
+      "severity": "P1",
+      "message": "Payment service p99 latency exceeds SLO by 2.4x for 8 minutes",
+      "fired_at": "2026-03-31T10:05:01Z"
+    },
+    {
+      "alert_id": "A-M001-2",
+      "service": "order-service",
+      "severity": "P2",
+      "message": "Order service error rate above 20% due to downstream timeouts",
+      "fired_at": "2026-03-31T10:05:08Z"
+    },
+    {
+      "alert_id": "A-M001-3",
+      "service": "redis-cache",
+      "severity": "P3",
+      "message": "Redis memory usage approaching eviction threshold",
+      "fired_at": "2026-03-31T10:05:13Z"
+    }
+  ],
+  "ground_truth": {
+    "root_cause_service": "payment-service",
+    "root_cause_type": "database_query_performance_degradation",
+    "correct_fix": "ANALYZE query execution plans and add index on transaction_id; kubectl rollout restart deploy/payment-service",
+    "failure_category": "real",
+    "severity": "P1",
+    "red_herrings": [
+      "redis-cache"
+    ]
+  },
+  "max_steps": 15
+}

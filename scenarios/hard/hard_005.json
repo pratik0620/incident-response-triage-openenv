@@ -1,0 +1,206 @@
+{
+  "scenario_id": "hard_005",
+  "difficulty": "hard",
+  "title": "Service mesh control plane network partition cascades across all services",
+  "description": "Region network partition causes service mesh control plane to become unreachable, leading to stale mTLS certs, misrouted traffic, and cascading failures across payment, order, and auth services.",
+  "logs": [
+    {
+      "timestamp": "2026-04-01T16:55:00Z",
+      "service": "auth-service",
+      "message": "mTLS certificate expiry: valid_until=2026-04-02T08:30:00Z (30 hours remaining)",
+      "level": "INFO"
+    },
+    {
+      "timestamp": "2026-04-01T16:55:08Z",
+      "service": "auth-service",
+      "message": "Certificate refresh attempt failed: unable to reach service mesh control plane at istiod.istio-system",
+      "level": "WARN"
+    },
+    {
+      "timestamp": "2026-04-01T16:55:15Z",
+      "service": "payment-service",
+      "message": "Outbound connection to auth-service: TLS handshake timeout after 5000ms",
+      "level": "ERROR"
+    },
+    {
+      "timestamp": "2026-04-01T16:55:22Z",
+      "service": "payment-service",
+      "message": "Connection attempts: 23 failures out of 34 requests (68% failure rate) in last 60s",
+      "level": "ERROR"
+    },
+    {
+      "timestamp": "2026-04-01T16:55:30Z",
+      "service": "order-service",
+      "message": "Inbound requests from api-gateway returned: TLS verification failed, cert chain invalid",
+      "level": "ERROR"
+    },
+    {
+      "timestamp": "2026-04-01T16:55:37Z",
+      "service": "order-service",
+      "message": "Circuit breaker: OPEN on payment-service calls after 5 consecutive 503 responses",
+      "level": "ERROR"
+    },
+    {
+      "timestamp": "2026-04-01T16:55:45Z",
+      "service": "api-gateway",
+      "message": "Inbound TLS connection from client rejected: certificate verification failed",
+      "level": "ERROR"
+    },
+    {
+      "timestamp": "2026-04-01T16:55:52Z",
+      "service": "api-gateway",
+      "message": "POST /orders returned 503 (Service Unavailable): order-service circuit breaker open",
+      "level": "ERROR"
+    },
+    {
+      "timestamp": "2026-04-01T16:56:00Z",
+      "service": "api-gateway",
+      "message": "POST /charge returned 504 (Gateway Timeout): payment-service TLS handshake timeout",
+      "level": "ERROR"
+    },
+    {
+      "timestamp": "2026-04-01T16:56:07Z",
+      "service": "inventory-service",
+      "message": "Sidecar proxy serving stale routing config: 4 minutes since last xDS update received",
+      "level": "WARN"
+    },
+    {
+      "timestamp": "2026-04-01T16:56:14Z",
+      "service": "logging-pipeline",
+      "message": "Log ingestion latency spike: 8.2s to process batch (baseline 1.2s)",
+      "level": "WARN"
+    },
+    {
+      "timestamp": "2026-04-01T16:56:21Z",
+      "service": "logging-pipeline",
+      "message": "Failed to reach log aggregator node in different AZ: connection refused",
+      "level": "WARN"
+    },
+    {
+      "timestamp": "2026-04-01T16:56:28Z",
+      "service": "backup-service",
+      "message": "Backup scheduled: daily incremental snapshot of database at 17:00 UTC",
+      "level": "INFO"
+    },
+    {
+      "timestamp": "2026-04-01T16:56:35Z",
+      "service": "auth-service",
+      "message": "Certificate refresh retry: still unable to contact istiod, using cached cert (valid 24h)",
+      "level": "WARN"
+    }
+  ],
+  "metrics": [
+    {
+      "service": "auth-service",
+      "cpu_pct": 55.1,
+      "mem_pct": 58.2,
+      "error_rate": 0.31,
+      "latency_p99_ms": 6100.0
+    },
+    {
+      "service": "payment-service",
+      "cpu_pct": 48.3,
+      "mem_pct": 62.4,
+      "error_rate": 0.68,
+      "latency_p99_ms": 5900.0
+    },
+    {
+      "service": "order-service",
+      "cpu_pct": 69.2,
+      "mem_pct": 73.1,
+      "error_rate": 0.42,
+      "latency_p99_ms": 5300.0
+    },
+    {
+      "service": "api-gateway",
+      "cpu_pct": 61.7,
+      "mem_pct": 64.3,
+      "error_rate": 0.38,
+      "latency_p99_ms": 4200.0
+    },
+    {
+      "service": "inventory-service",
+      "cpu_pct": 52.1,
+      "mem_pct": 59.7,
+      "error_rate": 0.12,
+      "latency_p99_ms": 1900.0
+    },
+    {
+      "service": "logging-pipeline",
+      "cpu_pct": 76.8,
+      "mem_pct": 68.5,
+      "error_rate": 0.06,
+      "latency_p99_ms": 8200.0
+    },
+    {
+      "service": "backup-service",
+      "cpu_pct": 41.9,
+      "mem_pct": 55.6,
+      "error_rate": 0.01,
+      "latency_p99_ms": 2100.0
+    }
+  ],
+  "alerts": [
+    {
+      "alert_id": "A-H005-1",
+      "service": "auth-service",
+      "severity": "P1",
+      "message": "Auth service mTLS certificate refresh failing and renewal approaching deadline",
+      "fired_at": "2026-04-01T16:55:09Z"
+    },
+    {
+      "alert_id": "A-H005-2",
+      "service": "payment-service",
+      "severity": "P1",
+      "message": "Payment service TLS handshake failure rate at 68% indicating mTLS infrastructure issue",
+      "fired_at": "2026-04-01T16:55:23Z"
+    },
+    {
+      "alert_id": "A-H005-3",
+      "service": "order-service",
+      "severity": "P2",
+      "message": "Order service TLS verification failures and circuit breaker activation",
+      "fired_at": "2026-04-01T16:55:38Z"
+    },
+    {
+      "alert_id": "A-H005-4",
+      "service": "api-gateway",
+      "severity": "P2",
+      "message": "API gateway experiencing cascading 503/504 errors across all downstream services",
+      "fired_at": "2026-04-01T16:55:53Z"
+    },
+    {
+      "alert_id": "A-H005-5",
+      "service": "inventory-service",
+      "severity": "P2",
+      "message": "Inventory service sidecar proxy running on stale config without recent xDS updates",
+      "fired_at": "2026-04-01T16:56:08Z"
+    },
+    {
+      "alert_id": "A-H005-6",
+      "service": "logging-pipeline",
+      "severity": "P3",
+      "message": "Logging pipeline experiencing cross-AZ connectivity issues and processing delays",
+      "fired_at": "2026-04-01T16:56:22Z"
+    },
+    {
+      "alert_id": "A-H005-7",
+      "service": "backup-service",
+      "severity": "P3",
+      "message": "Scheduled backup execution initiated",
+      "fired_at": "2026-04-01T16:56:29Z"
+    }
+  ],
+  "ground_truth": {
+    "root_cause_service": "service-mesh-control-plane",
+    "root_cause_type": "network_partition_control_plane",
+    "correct_fix": "Investigate network connectivity to service mesh control plane (istiod): check AWS/GCP security groups and firewall rules; verify region DNS resolution; restart affected sidecars after control plane recovers; kubectl rollout restart -n istio-system deploy/istiod; consider enabling control plane HA across AZs",
+    "failure_category": "flaky",
+    "severity": "P1",
+    "red_herrings": [
+      "logging-pipeline",
+      "backup-service"
+    ]
+  },
+  "max_steps": 20
+}

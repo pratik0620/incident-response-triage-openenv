@@ -1,0 +1,60 @@
+{
+  "scenario_id": "scenario_005",
+  "difficulty": "easy",
+  "title": "Auth token key rotation lag",
+  "description": "New JWT signing key was rotated, but one auth pod still serves stale keys.",
+  "logs": [
+    {
+      "timestamp": "2026-03-30T16:03:41Z",
+      "service": "auth-service",
+      "message": "JWKS refresh failed: timeout fetching new key set from issuer",
+      "level": "ERROR"
+    },
+    {
+      "timestamp": "2026-03-30T16:03:43Z",
+      "service": "auth-service",
+      "message": "Token validation failed: stale JWKS cache still using old key id",
+      "level": "ERROR"
+    },
+    {
+      "timestamp": "2026-03-30T16:03:44Z",
+      "service": "payment-service",
+      "message": "Authorization dependency returned intermittent 401 responses",
+      "level": "WARN"
+    }
+  ],
+  "metrics": [
+    {
+      "service": "auth-service",
+      "cpu_pct": 71.3,
+      "mem_pct": 76.5,
+      "error_rate": 0.29,
+      "latency_p99_ms": 1700.0
+    },
+    {
+      "service": "payment-service",
+      "cpu_pct": 41.0,
+      "mem_pct": 55.7,
+      "error_rate": 0.03,
+      "latency_p99_ms": 240.0
+    }
+  ],
+  "alerts": [
+    {
+      "alert_id": "A-5001",
+      "service": "auth-service",
+      "severity": "P2",
+      "message": "auth-service using stale JWKS cache after key rotation",
+      "fired_at": "2026-03-30T16:03:45Z"
+    }
+  ],
+  "ground_truth": {
+    "root_cause_service": "auth-service",
+    "root_cause_type": "stale_jwks_cache",
+    "correct_fix": "Force a JWKS cache refresh on the stale auth-service pod by invalidating the cache and restarting the pod. Reduce the JWKS cache TTL so keys are fetched more frequently after rotations. Add a background refresh job that proactively fetches new keys instead of waiting for cache expiry. Monitor for signature mismatch errors after future key rotations.",
+    "failure_category": "intermittent",
+    "severity": "P2",
+    "red_herrings": []
+  },
+  "max_steps": 10
+}

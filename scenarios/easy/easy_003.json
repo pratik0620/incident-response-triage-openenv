@@ -1,0 +1,60 @@
+{
+  "scenario_id": "scenario_003",
+  "difficulty": "easy",
+  "title": "Cache miss storm on product catalog",
+  "description": "Product page requests spike latency after a cache warm-up job failed.",
+  "logs": [
+    {
+      "timestamp": "2026-03-30T12:40:01Z",
+      "service": "catalog-service",
+      "message": "Cache warm-up job failed at startup: key preload did not run",
+      "level": "WARN"
+    },
+    {
+      "timestamp": "2026-03-30T12:40:03Z",
+      "service": "catalog-service",
+      "message": "Cache miss rate is 92% on product reads; falling back to database",
+      "level": "ERROR"
+    },
+    {
+      "timestamp": "2026-03-30T12:40:05Z",
+      "service": "search-service",
+      "message": "Search index healthy: query latency stable",
+      "level": "INFO"
+    }
+  ],
+  "metrics": [
+    {
+      "service": "catalog-service",
+      "cpu_pct": 76.2,
+      "mem_pct": 79.8,
+      "error_rate": 0.23,
+      "latency_p99_ms": 2800.0
+    },
+    {
+      "service": "search-service",
+      "cpu_pct": 29.4,
+      "mem_pct": 43.6,
+      "error_rate": 0.01,
+      "latency_p99_ms": 180.0
+    }
+  ],
+  "alerts": [
+    {
+      "alert_id": "A-3001",
+      "service": "catalog-service",
+      "severity": "P2",
+      "message": "catalog-service cache warm-up failed and cache miss rate above 90%",
+      "fired_at": "2026-03-30T12:40:06Z"
+    }
+  ],
+  "ground_truth": {
+    "root_cause_service": "catalog-service",
+    "root_cause_type": "cache_warmup_failed",
+    "correct_fix": "Manually trigger the cache warmup job to repopulate the catalog cache. Investigate why the scheduled warmup failed — check job logs for errors. Add a startup check that preloads the cache on pod initialization. Set up an alert for cache hit rate dropping below 80% to detect this earlier.",
+    "failure_category": "real",
+    "severity": "P2",
+    "red_herrings": []
+  },
+  "max_steps": 10
+}

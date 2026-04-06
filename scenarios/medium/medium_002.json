@@ -1,0 +1,108 @@
+{
+  "scenario_id": "medium_002",
+  "difficulty": "medium",
+  "title": "Inventory service config drift causes order failures",
+  "description": "Inventory service config mismatch causes it to reject valid requests, order-service retries fail, API gateway reports 503.",
+  "logs": [
+    {
+      "timestamp": "2026-03-31T12:20:10Z",
+      "service": "inventory-service",
+      "message": "Validation error: incoming SKU batch exceeds max_batch_size=50, actual=1200",
+      "level": "ERROR"
+    },
+    {
+      "timestamp": "2026-03-31T12:20:12Z",
+      "service": "inventory-service",
+      "message": "Request rejection rate spiked to 34% due to schema mismatches",
+      "level": "WARN"
+    },
+    {
+      "timestamp": "2026-03-31T12:20:15Z",
+      "service": "order-service",
+      "message": "Upstream inventory-service rejecting 33% of stock check requests with 400 errors",
+      "level": "ERROR"
+    },
+    {
+      "timestamp": "2026-03-31T12:20:18Z",
+      "service": "order-service",
+      "message": "Circuit breaker tripped: inventory-service health check failed 5 consecutive times",
+      "level": "ERROR"
+    },
+    {
+      "timestamp": "2026-03-31T12:20:22Z",
+      "service": "api-gateway",
+      "message": "POST /orders returned 503: order-service circuit broken due to inventory dependency",
+      "level": "ERROR"
+    },
+    {
+      "timestamp": "2026-03-31T12:20:25Z",
+      "service": "logging-pipeline",
+      "message": "Log aggregation lag detected: 2s delay in processing event timestamps",
+      "level": "WARN"
+    }
+  ],
+  "metrics": [
+    {
+      "service": "inventory-service",
+      "cpu_pct": 52.7,
+      "mem_pct": 64.2,
+      "error_rate": 0.34,
+      "latency_p99_ms": 850.0
+    },
+    {
+      "service": "order-service",
+      "cpu_pct": 68.9,
+      "mem_pct": 71.5,
+      "error_rate": 0.41,
+      "latency_p99_ms": 6200.0
+    },
+    {
+      "service": "api-gateway",
+      "cpu_pct": 58.3,
+      "mem_pct": 62.1,
+      "error_rate": 0.28,
+      "latency_p99_ms": 4500.0
+    },
+    {
+      "service": "logging-pipeline",
+      "cpu_pct": 43.2,
+      "mem_pct": 55.8,
+      "error_rate": 0.02,
+      "latency_p99_ms": 180.0
+    }
+  ],
+  "alerts": [
+    {
+      "alert_id": "A-M002-1",
+      "service": "inventory-service",
+      "severity": "P1",
+      "message": "Inventory service error rate spike to 34% suggesting config or schema issue",
+      "fired_at": "2026-03-31T12:20:13Z"
+    },
+    {
+      "alert_id": "A-M002-2",
+      "service": "order-service",
+      "severity": "P2",
+      "message": "Order service circuit breaker open: dependent service degraded",
+      "fired_at": "2026-03-31T12:20:19Z"
+    },
+    {
+      "alert_id": "A-M002-3",
+      "service": "logging-pipeline",
+      "severity": "P3",
+      "message": "Log aggregation latency increasing",
+      "fired_at": "2026-03-31T12:20:26Z"
+    }
+  ],
+  "ground_truth": {
+    "root_cause_service": "inventory-service",
+    "root_cause_type": "config_max_batch_size_mismatch",
+    "correct_fix": "kubectl set env deploy/inventory-service MAX_BATCH_SIZE=2000; kubectl rollout restart deploy/inventory-service",
+    "failure_category": "env_specific",
+    "severity": "P1",
+    "red_herrings": [
+      "logging-pipeline"
+    ]
+  },
+  "max_steps": 15
+}

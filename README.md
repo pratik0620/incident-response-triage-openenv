@@ -1,255 +1,75 @@
 ---
-title: Incident Response Triage Env Environment Server
-emoji: 🥉
-colorFrom: green
-colorTo: purple
+title: Incident Response Triage Env
+emoji: 🚨
+colorFrom: red
+colorTo: yellow
 sdk: docker
 pinned: false
 app_port: 8000
-base_path: /web
 tags:
   - openenv
+  - incident-response
+  - devops
+  - sre
+  - reinforcement-learning
 ---
 
-# Incident Response Triage Env Environment
+# Incident Response Triage Environment
+An OpenEnv reinforcement learning environment where AI agents diagnose real-world production incidents. The agent reads logs, metrics, and alerts from a simulated microservice system and must identify the root cause, propose a fix, and do so efficiently within a step budget.
 
-A simple test environment that echoes back messages. Perfect for testing the env APIs as well as demonstrating environment usage patterns.
+## Environment overview
 
-## Quick Start
+Real SRE teams respond to production incidents by reading logs and metrics, forming a hypothesis, and proposing a fix. This environment simulates that workflow. An agent takes investigative actions (read_logs, check_metrics) and terminal actions (identify_cause, propose_fix, escalate). Every episode is a unique incident scenario drawn from a pool of 15 realistic scenarios across 3 difficulty levels.
 
-The simplest way to use the Incident Response Triage Env environment is through the `IncidentResponseTriageEnv` class:
+## Action space
 
-```python
-from incident_response_triage_env import IncidentResponseTriageAction, IncidentResponseTriageEnv
+| Action | Type | Description |
+|---|---|---|
+| `read_logs` | Investigative | Fetch log entries for a service. Costs -0.02 reward per step. |
+| `check_metrics` | Investigative | Fetch CPU, memory, error rate, latency for a service. Costs -0.02 reward per step. |
+| `identify_cause` | Terminal | Declare the root cause service and failure type. Ends the episode. |
+| `propose_fix` | Terminal | Declare root cause AND propose a concrete fix. Ends the episode. |
+| `escalate` | Terminal | Hand off when unable to diagnose. Returns flat 0.2 reward. |
 
-try:
-    # Create environment from Docker image
-    incident_response_triage_envenv = IncidentResponseTriageEnv.from_docker_image("incident_response_triage_env-env:latest")
+## Observation space
 
-    # Reset
-    result = incident_response_triage_envenv.reset()
-    print(f"Reset: {result.observation.echoed_message}")
+Each step returns:
+- `logs` — timestamped log entries with service, level, and message
+- `metrics` — per-service CPU%, memory%, error rate, p99 latency
+- `alerts` — fired alerts with severity (P1–P4) and message
+- `step` / `max_steps` — current step and budget
+- `previous_actions` — history of actions taken
+- `task_description` — plain-English description of the incident
+- `reward` — reward for the current step
+- `done` / `final_score` — episode termination and final 0.0–1.0 score
 
-    # Send multiple messages
-    messages = ["Hello, World!", "Testing echo", "Final message"]
+## Tasks
 
-    for msg in messages:
-        result = incident_response_triage_envenv.step(IncidentResponseTriageAction(message=msg))
-        print(f"Sent: '{msg}'")
-        print(f"  → Echoed: '{result.observation.echoed_message}'")
-        print(f"  → Length: {result.observation.message_length}")
-        print(f"  → Reward: {result.reward}")
+| Difficulty | Scenarios | max_steps | Description |
+|---|---|---|---|
+| Easy | 5 | 10 | Single service, obvious root cause, no red herrings |
+| Medium | 5 | 15 | Cascading failures across 2–3 services, 1 red herring |
+| Hard | 5 | 20 | Noisy multi-service logs, 2+ red herrings, must classify failure type |
 
-finally:
-    # Always clean up
-    incident_response_triage_envenv.close()
-```
+## Reward function
 
-That's it! The `IncidentResponseTriageEnv.from_docker_image()` method handles:
-- Starting the Docker container
-- Waiting for the server to be ready
-- Connecting to the environment
-- Container cleanup when you call `close()`
+Scores are computed by a 6-signal grader:
 
-## Building the Docker Image
+| Signal | Weight (Easy / Medium / Hard) | Description |
+|---|---|---|
+| A — Root cause | 0.35 / 0.25 / 0.15 | Correct service and failure type identified |
+| B — Fix quality | 0.30 / 0.20 / 0.15 | Tiered fix scoring: restart (0.3), functional fix (0.7), fix + prevention (1.0) |
+| C — Reasoning | 0.10 / 0.25 / 0.30 | Causal chain explanation quality |
+| D — Faithfulness | 0.10 / 0.15 / 0.20 | Reasoning grounded in actual log content |
+| E — Noise handling | 0.10 / 0.10 / 0.15 | Red herring services correctly ignored |
+| F — Efficiency | 0.05 / 0.05 / 0.05 | Step budget usage (non-linear: faster = higher score) |
 
-Before using the environment, you need to build the Docker image:
+Investigative steps cost -0.02 reward each. Escalating returns a flat 0.2.
 
-```bash
-# From project root
-docker build -t incident_response_triage_env-env:latest -f server/Dockerfile .
-```
+## Running the environment
 
-## Deploying to Hugging Face Spaces
+The environment is deployed as a Hugging Face Space.
 
-You can easily deploy your OpenEnv environment to Hugging Face Spaces using the `openenv push` command:
+Base URL: https://pratik234567-incident-response-triage-env.hf.space
 
-```bash
-# From the environment directory (where openenv.yaml is located)
-openenv push
-
-# Or specify options
-openenv push --namespace my-org --private
-```
-
-The `openenv push` command will:
-1. Validate that the directory is an OpenEnv environment (checks for `openenv.yaml`)
-2. Prepare a custom build for Hugging Face Docker space (enables web interface)
-3. Upload to Hugging Face (ensuring you're logged in)
-
-### Prerequisites
-
-- Authenticate with Hugging Face: The command will prompt for login if not already authenticated
-
-### Options
-
-- `--directory`, `-d`: Directory containing the OpenEnv environment (defaults to current directory)
-- `--repo-id`, `-r`: Repository ID in format 'username/repo-name' (defaults to 'username/env-name' from openenv.yaml)
-- `--base-image`, `-b`: Base Docker image to use (overrides Dockerfile FROM)
-- `--private`: Deploy the space as private (default: public)
-
-### Examples
-
-```bash
-# Push to your personal namespace (defaults to username/env-name from openenv.yaml)
-openenv push
-
-# Push to a specific repository
-openenv push --repo-id my-org/my-env
-
-# Push with a custom base image
-openenv push --base-image ghcr.io/meta-pytorch/openenv-base:latest
-
-# Push as a private space
-openenv push --private
-
-# Combine options
-openenv push --repo-id my-org/my-env --base-image custom-base:latest --private
-```
-
-After deployment, your space will be available at:
-`https://huggingface.co/spaces/<repo-id>`
-
-The deployed space includes:
-- **Web Interface** at `/web` - Interactive UI for exploring the environment
-- **API Documentation** at `/docs` - Full OpenAPI/Swagger interface
-- **Health Check** at `/health` - Container health monitoring
-- **WebSocket** at `/ws` - Persistent session endpoint for low-latency interactions
-
-## Environment Details
-
-### Action
-**IncidentResponseTriageAction**: Contains a single field
-- `message` (str) - The message to echo back
-
-### Observation
-**IncidentResponseTriageObservation**: Contains the echo response and metadata
-- `echoed_message` (str) - The message echoed back
-- `message_length` (int) - Length of the message
-- `reward` (float) - Reward based on message length (length × 0.1)
-- `done` (bool) - Always False for echo environment
-- `metadata` (dict) - Additional info like step count
-
-### Reward
-The reward is calculated as: `message_length × 0.1`
-- "Hi" → reward: 0.2
-- "Hello, World!" → reward: 1.3
-- Empty message → reward: 0.0
-
-## Advanced Usage
-
-### Connecting to an Existing Server
-
-If you already have a Incident Response Triage Env environment server running, you can connect directly:
-
-```python
-from incident_response_triage_env import IncidentResponseTriageEnv
-
-# Connect to existing server
-incident_response_triage_envenv = IncidentResponseTriageEnv(base_url="<ENV_HTTP_URL_HERE>")
-
-# Use as normal
-result = incident_response_triage_envenv.reset()
-result = incident_response_triage_envenv.step(IncidentResponseTriageAction(message="Hello!"))
-```
-
-Note: When connecting to an existing server, `incident_response_triage_envenv.close()` will NOT stop the server.
-
-### Using the Context Manager
-
-The client supports context manager usage for automatic connection management:
-
-```python
-from incident_response_triage_env import IncidentResponseTriageAction, IncidentResponseTriageEnv
-
-# Connect with context manager (auto-connects and closes)
-with IncidentResponseTriageEnv(base_url="http://localhost:8000") as env:
-    result = env.reset()
-    print(f"Reset: {result.observation.echoed_message}")
-    # Multiple steps with low latency
-    for msg in ["Hello", "World", "!"]:
-        result = env.step(IncidentResponseTriageAction(message=msg))
-        print(f"Echoed: {result.observation.echoed_message}")
-```
-
-The client uses WebSocket connections for:
-- **Lower latency**: No HTTP connection overhead per request
-- **Persistent session**: Server maintains your environment state
-- **Efficient for episodes**: Better for many sequential steps
-
-### Concurrent WebSocket Sessions
-
-The server supports multiple concurrent WebSocket connections. To enable this,
-modify `server/app.py` to use factory mode:
-
-```python
-# In server/app.py - use factory mode for concurrent sessions
-app = create_app(
-    IncidentResponseTriageEnvironment,  # Pass class, not instance
-    IncidentResponseTriageAction,
-    IncidentResponseTriageObservation,
-    max_concurrent_envs=4,  # Allow 4 concurrent sessions
-)
-```
-
-Then multiple clients can connect simultaneously:
-
-```python
-from incident_response_triage_env import IncidentResponseTriageAction, IncidentResponseTriageEnv
-from concurrent.futures import ThreadPoolExecutor
-
-def run_episode(client_id: int):
-    with IncidentResponseTriageEnv(base_url="http://localhost:8000") as env:
-        result = env.reset()
-        for i in range(10):
-            result = env.step(IncidentResponseTriageAction(message=f"Client {client_id}, step {i}"))
-        return client_id, result.observation.message_length
-
-# Run 4 episodes concurrently
-with ThreadPoolExecutor(max_workers=4) as executor:
-    results = list(executor.map(run_episode, range(4)))
-```
-
-## Development & Testing
-
-### Direct Environment Testing
-
-Test the environment logic directly without starting the HTTP server:
-
-```bash
-# From the server directory
-python3 server/incident_response_triage_env_environment.py
-```
-
-This verifies that:
-- Environment resets correctly
-- Step executes actions properly
-- State tracking works
-- Rewards are calculated correctly
-
-### Running Locally
-
-Run the server locally for development:
-
-```bash
-uvicorn server.app:app --reload
-```
-
-## Project Structure
-
-```
-incident_response_triage_env/
-├── .dockerignore         # Docker build exclusions
-├── __init__.py            # Module exports
-├── README.md              # This file
-├── openenv.yaml           # OpenEnv manifest
-├── pyproject.toml         # Project metadata and dependencies
-├── uv.lock                # Locked dependencies (generated)
-├── client.py              # IncidentResponseTriageEnv client
-├── models.py              # Action and Observation models
-└── server/
-    ├── __init__.py        # Server module exports
-    ├── incident_response_triage_env_environment.py  # Core environment logic
-    ├── app.py             # FastAPI application (HTTP + WebSocket endpoints)
-    └── Dockerfile         # Container image definition
-```
+Example reset request: curl -X POST https://pratik234567-incident-response-triage-env.hf.space/reset

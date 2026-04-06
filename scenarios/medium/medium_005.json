@@ -1,0 +1,114 @@
+{
+  "scenario_id": "medium_005",
+  "difficulty": "medium",
+  "title": "Order processing backlog cascades to catalog updates",
+  "description": "Order service queue processing falls behind, preventing catalog updates from being acknowledged, causing catalog-service to stall.",
+  "logs": [
+    {
+      "timestamp": "2026-03-31T18:25:30Z",
+      "service": "order-service",
+      "message": "Task queue processing rate dropped from 50/sec to 12/sec",
+      "level": "WARN"
+    },
+    {
+      "timestamp": "2026-03-31T18:25:33Z",
+      "service": "order-service",
+      "message": "Worker pool saturation detected: 95% of workers processing long-running transactions",
+      "level": "WARN"
+    },
+    {
+      "timestamp": "2026-03-31T18:25:37Z",
+      "service": "order-service",
+      "message": "Catalog sync acknowledgment timeout: waiting >4000ms for order service response",
+      "level": "ERROR"
+    },
+    {
+      "timestamp": "2026-03-31T18:25:40Z",
+      "service": "catalog-service",
+      "message": "Inventory sync messages queuing up: unable to commit stock reductions to order-service",
+      "level": "ERROR"
+    },
+    {
+      "timestamp": "2026-03-31T18:25:44Z",
+      "service": "catalog-service",
+      "message": "Backlog of pending updates: 847 sync requests waiting for acknowledgment",
+      "level": "ERROR"
+    },
+    {
+      "timestamp": "2026-03-31T18:25:48Z",
+      "service": "api-gateway",
+      "message": "PUT /products returned 503: catalog-service unable to accept updates",
+      "level": "ERROR"
+    },
+    {
+      "timestamp": "2026-03-31T18:25:51Z",
+      "service": "cdn-cache",
+      "message": "Cache invalidation requests delayed but not failing",
+      "level": "WARN"
+    }
+  ],
+  "metrics": [
+    {
+      "service": "order-service",
+      "cpu_pct": 82.1,
+      "mem_pct": 79.4,
+      "error_rate": 0.11,
+      "latency_p99_ms": 5900.0
+    },
+    {
+      "service": "catalog-service",
+      "cpu_pct": 67.3,
+      "mem_pct": 73.6,
+      "error_rate": 0.28,
+      "latency_p99_ms": 4600.0
+    },
+    {
+      "service": "api-gateway",
+      "cpu_pct": 59.8,
+      "mem_pct": 61.4,
+      "error_rate": 0.21,
+      "latency_p99_ms": 3800.0
+    },
+    {
+      "service": "cdn-cache",
+      "cpu_pct": 44.2,
+      "mem_pct": 52.7,
+      "error_rate": 0.02,
+      "latency_p99_ms": 280.0
+    }
+  ],
+  "alerts": [
+    {
+      "alert_id": "A-M005-1",
+      "service": "order-service",
+      "severity": "P1",
+      "message": "Order service processing latency spike suggests worker pool contention",
+      "fired_at": "2026-03-31T18:25:34Z"
+    },
+    {
+      "alert_id": "A-M005-2",
+      "service": "catalog-service",
+      "severity": "P2",
+      "message": "Catalog service sync backlog growing: orders service not acknowledging updates",
+      "fired_at": "2026-03-31T18:25:41Z"
+    },
+    {
+      "alert_id": "A-M005-3",
+      "service": "cdn-cache",
+      "severity": "P3",
+      "message": "CDN cache invalidation latency increasing",
+      "fired_at": "2026-03-31T18:25:52Z"
+    }
+  ],
+  "ground_truth": {
+    "root_cause_service": "order-service",
+    "root_cause_type": "worker_pool_saturation",
+    "correct_fix": "Increase WORKER_CONCURRENCY from 20 to 50; kubectl set env deploy/order-service WORKER_CONCURRENCY=50; or optimize transaction processing logic",
+    "failure_category": "env_specific",
+    "severity": "P1",
+    "red_herrings": [
+      "cdn-cache"
+    ]
+  },
+  "max_steps": 15
+}

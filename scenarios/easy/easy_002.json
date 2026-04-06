@@ -1,0 +1,86 @@
+{
+  "scenario_id": "easy_002",
+  "difficulty": "easy",
+  "title": "Order service out of memory kill",
+  "description": "The order service is crashing repeatedly. Users cannot place new orders.",
+  "max_steps": 10,
+  "logs": [
+    {
+      "timestamp": "2026-04-01T11:02:10Z",
+      "service": "order-service",
+      "level": "WARN",
+      "message": "Heap usage at 89% — GC running continuously"
+    },
+    {
+      "timestamp": "2026-04-01T11:02:45Z",
+      "service": "order-service",
+      "level": "FATAL",
+      "message": "Killed: Out of memory — container exceeded memory limit of 512Mi"
+    },
+    {
+      "timestamp": "2026-04-01T11:02:46Z",
+      "service": "order-service",
+      "level": "INFO",
+      "message": "Container restarting (CrashLoopBackOff restart #3)"
+    },
+    {
+      "timestamp": "2026-04-01T11:02:47Z",
+      "service": "api-gateway",
+      "level": "ERROR",
+      "message": "POST /orders 503 Service Unavailable — order-service unreachable"
+    },
+    {
+      "timestamp": "2026-04-01T11:02:50Z",
+      "service": "auth-service",
+      "level": "INFO",
+      "message": "Token validation healthy: p99=18ms"
+    }
+  ],
+  "metrics": [
+    {
+      "service": "order-service",
+      "cpu_pct": 95.2,
+      "mem_pct": 99.8,
+      "error_rate": 4.1,
+      "latency_p99_ms": 0.0
+    },
+    {
+      "service": "api-gateway",
+      "cpu_pct": 22.1,
+      "mem_pct": 41.3,
+      "error_rate": 3.8,
+      "latency_p99_ms": 520.0
+    },
+    {
+      "service": "auth-service",
+      "cpu_pct": 12.4,
+      "mem_pct": 29.1,
+      "error_rate": 0.0,
+      "latency_p99_ms": 18.0
+    }
+  ],
+  "alerts": [
+    {
+      "alert_id": "A-2001",
+      "service": "order-service",
+      "severity": "P1",
+      "message": "order-service CrashLoopBackOff — OOM kill detected, pod restarting",
+      "fired_at": "2026-04-01T11:02:47Z"
+    },
+    {
+      "alert_id": "A-2002",
+      "service": "api-gateway",
+      "severity": "P2",
+      "message": "POST /orders error rate above 3/s — order-service unreachable",
+      "fired_at": "2026-04-01T11:02:50Z"
+    }
+  ],
+  "ground_truth": {
+    "root_cause_service": "order-service",
+    "root_cause_type": "memory_leak",
+    "correct_fix": "Increase the memory limit for order-service from 512Mi to at least 1Gi in the deployment manifest. Profile the heap to find the leaking object — check for unbounded caches or large object accumulation. Add a liveness probe so Kubernetes restarts the pod automatically if memory exceeds threshold. Investigate recent code changes for memory leaks.",
+    "failure_category": "real",
+    "severity": "P1",
+    "red_herrings": []
+  }
+}

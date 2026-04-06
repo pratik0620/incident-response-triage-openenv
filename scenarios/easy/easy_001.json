@@ -1,0 +1,73 @@
+{
+  "scenario_id": "scenario_001",
+  "difficulty": "easy",
+  "title": "Payment API timeout spike",
+  "description": "Checkout requests are timing out due to upstream failures in the payment-service.",
+  "logs": [
+    {
+      "timestamp": "2026-03-30T09:15:01Z",
+      "service": "api-gateway",
+      "message": "POST /checkout returned 504 because upstream payment-service timed out after 5000ms",
+      "level": "ERROR"
+    },
+    {
+      "timestamp": "2026-03-30T09:15:03Z",
+      "service": "payment-service",
+      "message": "Failed to acquire DB connection: timeout after 5000ms",
+      "level": "ERROR"
+    },
+    {
+      "timestamp": "2026-03-30T09:15:05Z",
+      "service": "payment-service",
+      "message": "Connection pool exhausted: max_connections=10 active=10 waiting=52",
+      "level": "FATAL"
+    },
+    {
+      "timestamp": "2026-03-30T09:15:06Z",
+      "service": "auth-service",
+      "message": "Token validation healthy: p99=95ms",
+      "level": "INFO"
+    }
+  ],
+  "metrics": [
+    {
+      "service": "payment-service",
+      "cpu_pct": 82.6,
+      "mem_pct": 84.3,
+      "error_rate": 0.38,
+      "latency_p99_ms": 5100.0
+    },
+    {
+      "service": "api-gateway",
+      "cpu_pct": 39.4,
+      "mem_pct": 53.1,
+      "error_rate": 0.04,
+      "latency_p99_ms": 340.0
+    }
+  ],
+  "alerts": [
+    {
+      "alert_id": "A-1001",
+      "service": "payment-service",
+      "severity": "P1",
+      "message": "payment-service DB connection pool exhausted for 5m",
+      "fired_at": "2026-03-30T09:15:07Z"
+    },
+    {
+      "alert_id": "A-1002",
+      "service": "api-gateway",
+      "severity": "P2",
+      "message": "Gateway 504 rate increased due to payment-service upstream timeouts",
+      "fired_at": "2026-03-30T09:15:07Z"
+    }
+  ],
+  "ground_truth": {
+    "root_cause_service": "payment-service",
+    "root_cause_type": "db_connection_pool_exhaustion",
+    "correct_fix": "Increase the database connection pool size in payment-service configuration. Deploy pgBouncer as a connection pooler to prevent pool exhaustion under load. Investigate why the pool was exhausted — check for connection leaks or sudden traffic spikes.",
+    "failure_category": "real",
+    "severity": "P1",
+    "red_herrings": []
+  },
+  "max_steps": 10
+}

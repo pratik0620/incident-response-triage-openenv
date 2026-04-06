@@ -1,0 +1,60 @@
+{
+  "scenario_id": "scenario_004",
+  "difficulty": "easy",
+  "title": "Notification queue backlog",
+  "description": "Email notifications are delayed because workers are throttled by an outdated config.",
+  "logs": [
+    {
+      "timestamp": "2026-03-30T14:11:09Z",
+      "service": "notification-worker",
+      "message": "Worker rate limit set too low: WORKER_RATE_LIMIT=5 messages/sec",
+      "level": "WARN"
+    },
+    {
+      "timestamp": "2026-03-30T14:11:10Z",
+      "service": "notification-worker",
+      "message": "Queue backlog growing: processing 5/sec while enqueue rate is 42/sec",
+      "level": "ERROR"
+    },
+    {
+      "timestamp": "2026-03-30T14:11:12Z",
+      "service": "api-gateway",
+      "message": "POST /notify accepted with normal response times",
+      "level": "INFO"
+    }
+  ],
+  "metrics": [
+    {
+      "service": "notification-worker",
+      "cpu_pct": 72.1,
+      "mem_pct": 74.4,
+      "error_rate": 0.19,
+      "latency_p99_ms": 2300.0
+    },
+    {
+      "service": "queue-service",
+      "cpu_pct": 24.1,
+      "mem_pct": 58.7,
+      "error_rate": 0.01,
+      "latency_p99_ms": 110.0
+    }
+  ],
+  "alerts": [
+    {
+      "alert_id": "A-4001",
+      "service": "notification-worker",
+      "severity": "P3",
+      "message": "notification-worker throttled by low WORKER_RATE_LIMIT causing queue backlog",
+      "fired_at": "2026-03-30T14:11:13Z"
+    }
+  ],
+  "ground_truth": {
+    "root_cause_service": "notification-worker",
+    "root_cause_type": "worker_rate_limit_misconfiguration",
+    "correct_fix": "Increase the WORKER_RATE_LIMIT environment variable in the notification-worker deployment to match current queue throughput requirements. The current limit is too low for the message volume. Update the config, redeploy, and monitor drain rate. Add an alert on queue backlog depth to detect this automatically in future.",
+    "failure_category": "env_specific",
+    "severity": "P3",
+    "red_herrings": []
+  },
+  "max_steps": 10
+}

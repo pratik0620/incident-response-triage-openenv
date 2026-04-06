@@ -1,7 +1,30 @@
 spec_version: 1
 name: incident_response_triage_env
-type: space
+type: environment
 runtime: fastapi
 app: server.app:app
 port: 8000
 
+description: Reinforcement Learning environment for an incident response triage in distributed microservice systems. Agents analyze logs, identify root causes and propose fixes.
+
+author:
+  - Pratik Morkar
+  - Nishant Ninawe
+  - Surabhi Nikam
+
+tags:
+  - incident-response
+  - devops
+  - sre
+  - reinforcement-learning
+  - debugging
+
+tasks:
+  - id: easy
+    description: Basic incident with clear signals
+  - id: medium
+    description: Incident with multiple possible causes
+  - id: hard
+    description: Noisy signals requiring multi-step reasoning
+
+repository: https://github.com/pratik0620/incident-response-triage-openenv

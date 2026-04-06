@@ -14,10 +14,9 @@ version = "0.1.0"
 description = "Incident Response Triage Env environment for OpenEnv"
 requires-python = ">=3.10"
 dependencies = [
-    # Core OpenEnv runtime (provides FastAPI server + HTTP client types)
-    # install from github
-    # "openenv-core[core] @ git+https://github.com/meta-pytorch/OpenEnv.git",
     "openenv-core[core]>=0.2.1",
+    "openai>=1.0.0",
+    "python-dotenv>=1.0.0",
     # Environment-specific dependencies
     # Add all dependencies needed for your environment here
     # Examples:
@@ -41,5 +40,10 @@ server = "incident_response_triage_env.server.app:main"
 
 [tool.setuptools]
 include-package-data = true
-packages = ["incident_response_triage_env", "incident_response_triage_env.server"]
-package-dir = { "incident_response_triage_env" = ".", "incident_response_triage_env.server" = "server" }
+packages = [
+    "incident_response_triage_env",
+    "incident_response_triage_env.server",
+    "incident_response_triage_env.graders",
+    "incident_response_triage_env.scenarios",
+]
+package-dir = { "incident_response_triage_env" = ".", "incident_response_triage_env.server" = "server", "incident_response_triage_env.graders" = "graders", "incident_response_triage_env.scenarios" = "scenarios" }
