@@ -62,9 +62,9 @@ from incident_response_triage_env.models import IncidentResponseTriageAction  # 
 
 
 #==========Configuration (all overridable via environment variables)==========#
-API_KEY = os.getenv("HF_TOKEN") or os.getenv("API_KEY")
+API_KEY = os.getenv("HF_TOKEN") or os.getenv("API_KEY") or os.getenv("OPENAI_API_KEY")
 API_BASE_URL = os.getenv("API_BASE_URL", "https://router.huggingface.co/v1")
-MODEL_NAME = os.getenv("MODEL_NAME", "Qwen/Qwen2.5-72B-Instruct")
+MODEL_NAME = os.getenv("MODEL_NAME", "Qwen/Qwen2.5-7B-Instruct")
 IMAGE_NAME = os.getenv("IMAGE_NAME") or os.getenv("LOCAL_IMAGE_NAME")
 ENV_BASE_URL = os.getenv("ENV_BASE_URL", "http://localhost:8000")
 
@@ -258,7 +258,7 @@ def get_model_action(client: OpenAI, user_prompt: str) -> Tuple[IncidentResponse
 
 async def main() -> None:
     if not API_KEY:
-        print("[DEBUG] HF_TOKEN / API_KEY not set — LLM calls will fail.", flush=True)
+        raise ValueError("HF_TOKEN (or OPENAI_API_KEY) environment variable is required.")
 
     client = OpenAI(base_url=API_BASE_URL, api_key=API_KEY or "")
 

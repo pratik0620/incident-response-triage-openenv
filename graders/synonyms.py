@@ -105,6 +105,10 @@ CAUSE_SYNONYMS: Dict[str, List[str]] = {
         "connection leak", "db leak", "connection not closed", "leaked connection",
         "connection exhausted", "pool leak", "unclosed connection",
     ],
+    "db_connection_pool_exhaustion": [
+        "connection pool exhausted", "pool exhausted", "db pool",
+        "max connections", "connection timeout", "connection limit reached",
+    ],
     "jwks_cache_invalidation_loop": [
         "jwks", "cache invalidation", "jwt key", "key refresh loop",
         "token key", "signing key", "cache thrash",
@@ -160,6 +164,11 @@ FIX_TIERS: Dict[str, Dict[str, List[str]]] = {
         "tier_2": ["pool size", "connection limit", "increase", "max connections", "timeout"],
         "tier_3": ["pool size", "increase", "timeout", "monitor", "alert", "connection limit",
                    "retry", "circuit breaker"],
+    },
+    "db_connection_pool_exhaustion": {
+        "tier_1": ["restart", "redeploy"],
+        "tier_2": ["pool size", "connection limit", "increase", "max connections"],
+        "tier_3": ["pool size", "increase", "monitor", "alert", "circuit breaker"],
     },
     "connection_timeout": {
         "tier_1": ["restart", "redeploy"],
