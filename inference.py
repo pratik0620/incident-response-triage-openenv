@@ -99,7 +99,15 @@ SYSTEM_PROMPT = textwrap.dedent(
       "service"      (string or null) — optional focus service
 
     For hard difficulty, identify_cause answers must also mention the failure category:
-    real, flaky, intermittent, or env_specific.
+    real, flaky, intermittent or env_specific.
+    
+    --- OUTPUT GUIDELINES FOR "answer" FIELD ---
+    - Always include the service name and failure type
+    - Use causal reasoning phrases: "the logs show", "due to", "leading to"
+    - Ground your answer in evidence from logs or metrics
+    - Keep answer concise but informative (1–2 sentences)
+    - For medium and hard tasks, prefer "propose_fix" and include a concrete fix (e.g., restart, scale, config change)
+    - Avoid vague outputs like "real" or single-word answers
     """
 ).strip()
 

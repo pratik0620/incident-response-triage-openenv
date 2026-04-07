@@ -181,6 +181,20 @@ Evaluated using `Qwen/Qwen2.5-7B-Instruct` via HuggingFace router.
 
 ---
 
+## 🔍 Observations from Baseline Agent
+
+During evaluation, we observed that agent performance improves significantly when:
+
+- The **answer field includes explicit causal reasoning**, not just labels
+- The agent uses phrases like *"the logs show"*, *"due to"*, and *"leading to"* to form a clear causal chain
+- The **service name and failure type are explicitly mentioned**
+- On medium and hard tasks, using `propose_fix` instead of `identify_cause` unlocks additional reward signals
+- Answers are grounded in **log and metric evidence**, improving faithfulness scores
+
+These observations highlight that the environment rewards **structured reasoning, evidence grounding, and decision efficiency**, rather than short or implicit answers.
+
+---
+
 ## Environment API
 ```python
 from incident_response_triage_env.client import IncidentResponseTriageEnv
