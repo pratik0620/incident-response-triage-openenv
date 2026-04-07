@@ -29,6 +29,19 @@ Each episode presents the agent with a live incident: cascading service failures
 
 ---
 
+## Agent-Environment Interaction
+
+Each episode follows a structured interaction loop between the agent and the environment:
+
+1. **Reset** → Environment returns the initial observation (logs, metrics, alerts)
+2. **Act** → Agent selects an action (e.g., `read_logs`, `check_metrics`, `identify_cause`, `propose_fix`, `escalate`)
+3. **Observe** → Environment returns updated observation (logs, metrics, alerts) + reward
+4. **Repeat** → Until terminal action or step budget is reached
+
+![Agent Environment Interaction](./assets/interactions.png)
+
+---
+
 ## Why this environment is realistic
 
 This environment mirrors real-world incident response workflows used by SRE teams:
@@ -58,7 +71,7 @@ Unlike synthetic benchmarks, this environment rewards **causal reasoning, eviden
 {
   "action_type": "identify_cause",
   "reasoning": "The logs show connection pool exhausted on postgres-primary...",
-  "answer": "postgres-primary — db_connection_pool_exhaustion",
+  "answer": "db_connection_pool_exhaustion",
   "service": "postgres-primary"
 }
 ```
@@ -180,7 +193,7 @@ async with IncidentResponseTriageEnv(base_url="https://your-space.hf.space") as 
     action = IncidentResponseTriageAction(
         action_type="identify_cause",
         reasoning="Logs show connection pool exhausted on postgres-primary",
-        answer="postgres-primary — connection pool exhaustion",
+        answer="db_connection_pool_exhaustion",
     )
     result = await env.step(action)
     print(result.observation.final_score)  # 0.0–1.0
