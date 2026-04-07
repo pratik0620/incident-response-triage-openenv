@@ -63,6 +63,13 @@ _ESCALATE_BASE = 0.2
 # Hard difficulty label
 _HARD = "hard"
 
+# Score bounds — strictly between 0 and 1 as required by OpenEnv validator.
+_SCORE_MIN = 0.01
+_SCORE_MAX = 0.99
+
+def _safe_score(score: float) -> float:
+    """Clamp score to strictly (0, 1) — i.e. [0.01, 0.99]."""
+    return round(max(_SCORE_MIN, min(score, _SCORE_MAX)), 4)
 
 def compute_final_score(
     action_type: str,
@@ -93,10 +100,10 @@ def compute_final_score(
 
     # ── Handle escalate and invalid actions immediately ───────────────────────
     if action_type == "escalate":
-        return round(_ESCALATE_BASE, 4)
+        return _safe_score(_ESCALATE_BASE)
 
     if action_type not in ("identify_cause", "propose_fix"):
-        return 0.0
+        return _safe_score(0.05)
 
     # ── Compute all six signals ───────────────────────────────────────────────
 
@@ -151,7 +158,7 @@ def compute_final_score(
         difficulty=difficulty,
     )
 
-    return round(max(0.0, min(final, 1.0)), 4)
+    return _safe_score(final)
 
 
 def compute_score_breakdown(
@@ -175,7 +182,7 @@ def compute_score_breakdown(
     """
     if action_type == "escalate":
         return {
-            "final_score": _ESCALATE_BASE,
+            "final_score": _safe_score(_ESCALATE_BASE),
             "root_cause": 0.0,
             "fix_quality": 0.0,
             "reasoning": 0.0,
@@ -189,7 +196,7 @@ def compute_score_breakdown(
 
     if action_type not in ("identify_cause", "propose_fix"):
         return {
-            "final_score": 0.0,
+            "final_score": _safe_score(0.05),
             "root_cause": 0.0,
             "fix_quality": 0.0,
             "reasoning": 0.0,
@@ -216,7 +223,7 @@ def compute_score_breakdown(
     weights = get_weights_for_action(difficulty, action_type)
     base = weighted_sum(sig_a, sig_b, sig_c, sig_d, sig_e, sig_f, weights)
     final = apply_adjustment_rules(base, sig_a, sig_b, sig_c, sig_e, difficulty)
-    final = round(max(0.0, min(final, 1.0)), 4)
+    final = _safe_score(final)
 
     return {
         "final_score":   final,
