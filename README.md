@@ -217,6 +217,6 @@ incident_response_triage_env/
 
 - **Pratik Morkar**
 - **Nishant Ninawe**
-- **Surabhi Nikam**`
+- **Surabhi Nikam**
 
 Built with [OpenEnv](https://github.com/meta-pytorch/OpenEnv) · [HuggingFace](https://huggingface.co) · [Meta PyTorch](https://github.com/meta-pytorch)
