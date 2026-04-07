@@ -52,12 +52,17 @@ class IncidentResponseTriageEnvironment(Environment):
             done=False,
         )
 
-        return self._build_observation(reward=0.0, done=False)
+        return self._build_observation(reward=0.01, done=False)
 
 
     def step(self, action: IncidentResponseTriageAction) -> IncidentResponseTriageObservation:  # type: ignore[override]
         if self._state.done:
-            return self._build_observation(reward=0.0, done=True, msg="Episode ended.")
+            return self._build_observation(
+                reward=self._state.final_score or 0.01,
+                done=True,
+                msg="Episode ended.",
+                final_score=self._state.final_score,
+            )
 
         action_type = (action.action_type or "").strip().lower()
 
@@ -114,10 +119,21 @@ class IncidentResponseTriageEnvironment(Environment):
 
     def _force_end(self):
         self._state.done = True
+        # Score as escalate — agent ran out of steps without diagnosing
+        score = compute_final_score(
+            action_type="escalate",
+            answer="",
+            ground_truth=self.current_scenario.ground_truth,
+            steps_used=self._state.max_steps,
+            max_steps=self._state.max_steps,
+            difficulty=self.current_scenario.difficulty,
+            log_content="",
+        )
+        self._state.final_score = score
         return self._build_observation(
-            reward=0.0,
+            reward=score,
             done=True,
-            msg="Max steps crossed. Episode ended."
+            final_score=score,
         )
 
 

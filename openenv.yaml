@@ -22,21 +22,9 @@ tags:
 tasks:
   - id: easy
     description: Basic incident with clear signals
-    grader:
-      type: python
-      path: graders/composite_grader.py
-      function: compute_final_score
   - id: medium
     description: Incident with multiple possible causes
-    grader:
-      type: python
-      path: graders/composite_grader.py
-      function: compute_final_score
   - id: hard
     description: Noisy signals requiring multi-step reasoning
-    grader:
-      type: python
-      path: graders/composite_grader.py
-      function: compute_final_score
 
 repository: https://github.com/pratik0620/incident-response-triage-openenv

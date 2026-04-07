@@ -181,7 +181,7 @@ Evaluated using `Qwen/Qwen2.5-7B-Instruct` via HuggingFace router.
 
 ---
 
-## 🔍 Observations from Baseline Agent
+## Observations from Baseline Agent
 
 During evaluation, we observed that agent performance improves significantly when:
 
