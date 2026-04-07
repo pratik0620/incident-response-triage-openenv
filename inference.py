@@ -111,7 +111,7 @@ def log_start(task: str, env: str, model: str) -> None:
 def log_step(step: int, action: str, reward: float, done: bool, error: Optional[str]) -> None:
     error_val = error.replace("\n", " ").replace("\r", " ") if error else "null"
     print(
-        f"[STEP] step={step} action={action} reward={reward:.2f} "
+        f"[STEP]  step={step} action={action} reward={reward:.2f} "
         f"done={str(done).lower()} error={error_val}",
         flush=True,
     )
@@ -256,18 +256,11 @@ def get_model_action(client: OpenAI, user_prompt: str) -> Tuple[IncidentResponse
     return action, raw.replace("\n", " ")[:800]
 
 
-async def main() -> None:
-    if not API_KEY:
-        raise ValueError("HF_TOKEN (or OPENAI_API_KEY) environment variable is required.")
-
-    client = OpenAI(base_url=API_BASE_URL, api_key=API_KEY or "")
-
+async def run_single_episode(client: OpenAI, difficulty: str):
     env: Optional[IncidentResponseTriageEnv] = None
     rewards: List[float] = []
     steps_taken = 0
     success = False
-
-    log_start(task=TASK_NAME, env=BENCHMARK, model=MODEL_NAME)
 
     try:
         if IMAGE_NAME:
@@ -276,7 +269,7 @@ async def main() -> None:
             env = IncidentResponseTriageEnv(base_url=ENV_BASE_URL)
             await env.connect()
 
-        result = await env.reset(difficulty=DIFFICULTY)
+        result = await env.reset(difficulty=difficulty)
         obs = result.observation
 
         for _ in range(MAX_EPISODE_STEPS):
@@ -306,21 +299,39 @@ async def main() -> None:
 
             if done:
                 fs = getattr(obs, "final_score", None)
-                if fs is not None and float(fs) >= SUCCESS_SCORE_THRESHOLD:
-                    success = True
+                if fs is not None:
+                    final_score = float(fs)
+                    if final_score >= SUCCESS_SCORE_THRESHOLD:
+                        success = True
                 break
 
     except Exception as exc:
-        print(f"[DEBUG] Episode error: {exc}", flush=True)
+        print(f"[DEBUG] Episode error ({difficulty}): {exc}", flush=True)
 
     finally:
         if env is not None:
             try:
                 await env.close()
-            except Exception as exc:
-                print(f"[DEBUG] env.close() error: {exc}", flush=True)
+            except Exception:
+                pass
 
-        log_end(success=success, steps=steps_taken, rewards=rewards)
+    log_end(success=success, steps=steps_taken, rewards=rewards)
+
+
+async def main() -> None:
+    if not API_KEY:
+        raise ValueError("HF_TOKEN (or OPENAI_API_KEY) environment variable is required.")
+
+    client = OpenAI(base_url=API_BASE_URL, api_key=API_KEY or "")
+
+    if DIFFICULTY == "all":
+        difficulties = ["easy", "medium", "hard"]
+    else:
+        difficulties = [DIFFICULTY]
+
+    for diff in difficulties:
+        log_start(task=TASK_NAME, env=BENCHMARK, model=MODEL_NAME)
+        await run_single_episode(client, diff)
 
 
 if __name__ == "__main__":
