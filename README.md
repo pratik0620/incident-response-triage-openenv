@@ -200,7 +200,7 @@ These observations highlight that the environment rewards **structured reasoning
 from incident_response_triage_env.client import IncidentResponseTriageEnv
 from incident_response_triage_env.models import IncidentResponseTriageAction
 
-async with IncidentResponseTriageEnv(base_url="https://your-space.hf.space") as env:
+async with IncidentResponseTriageEnv(base_url="https://huggingface.co/spaces/pratik234567/incident-response-triage-env") as env:
     result = await env.reset(difficulty="easy")
     obs = result.observation
 
