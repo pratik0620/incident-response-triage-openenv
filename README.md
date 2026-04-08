@@ -162,11 +162,6 @@ docker build -t incident-response-env:local .
 docker run -p 8000:8000 incident-response-env:local
 ```
 
-**Run all difficulties:**
-```bash
-INCIDENT_TRIAGE_DIFFICULTY=all python inference.py
-```
-
 ---
 
 ## Baseline scores

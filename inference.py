@@ -341,13 +341,10 @@ async def main() -> None:
 
     client = OpenAI(base_url=API_BASE_URL, api_key=API_KEY or "")
 
-    if DIFFICULTY == "all":
-        difficulties = ["easy", "medium", "hard"]
-    else:
-        difficulties = [DIFFICULTY]
+    difficulties = ["easy", "medium", "hard"]
 
     for diff in difficulties:
-        log_start(task=TASK_NAME, env=BENCHMARK, model=MODEL_NAME)
+        log_start(task=diff, env=BENCHMARK, model=MODEL_NAME)
         await run_single_episode(client, diff)
 
 
