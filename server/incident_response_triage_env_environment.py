@@ -41,8 +41,38 @@ class IncidentResponseTriageEnvironment(Environment):
         self.current_scenario: Scenario | None = None
 
 
-    def reset(self, difficulty: str = "easy") -> IncidentResponseTriageObservation:
-        self.current_scenario = load_random_scenario(difficulty)
+    @staticmethod
+    def _normalize_score(score: float) -> float:
+        """Enforce strictly open (0, 1) range for final_score.
+
+        OpenEnv Phase 2 validator requires: 0 < final_score < 1.
+        This guard is applied to every path that returns a terminal score.
+        """
+        if score is None:
+            return 0.01
+        if score <= 0.0:
+            return 0.01
+        if score >= 1.0:
+            return 0.99
+        return max(0.01, min(score, 0.99))
+
+    def reset(
+        self,
+        difficulty: str = "easy",
+        task_id: str | None = None,
+    ) -> IncidentResponseTriageObservation:
+        """Reset the environment for a new episode.
+
+        Args:
+            difficulty: Scenario difficulty — "easy", "medium", or "hard".
+            task_id:    OpenEnv task identifier (mirrors difficulty for this
+                        environment).  When provided, it overrides `difficulty`
+                        so that the HuggingFace platform's task-based resets
+                        (``{"task_id": "easy"}``) resolve correctly.
+        """
+        # task_id mirrors difficulty in this environment (easy/medium/hard)
+        effective_difficulty = task_id if task_id is not None else difficulty
+        self.current_scenario = load_random_scenario(effective_difficulty)
 
         self._state = IncidentResponseTriageState(
             episode_id=str(uuid4()),
@@ -56,12 +86,15 @@ class IncidentResponseTriageEnvironment(Environment):
 
 
     def step(self, action: IncidentResponseTriageAction) -> IncidentResponseTriageObservation:  # type: ignore[override]
+        if self.current_scenario is None:
+            self.reset(difficulty="easy")
+
         if self._state.done:
             return self._build_observation(
-                reward=self._state.final_score or 0.01,
+                reward=self._normalize_score(self._state.final_score or 0.01),
                 done=True,
                 msg="Episode ended.",
-                final_score=self._state.final_score,
+                final_score=self._normalize_score(self._state.final_score or 0.01),
             )
 
         action_type = (action.action_type or "").strip().lower()
@@ -97,7 +130,7 @@ class IncidentResponseTriageEnvironment(Environment):
             for a in self.current_scenario.alerts
         )
 
-        score = compute_final_score(
+        raw_score = compute_final_score(
             action_type=action_type,
             answer=answer_text,
             ground_truth=self.current_scenario.ground_truth,
@@ -106,6 +139,7 @@ class IncidentResponseTriageEnvironment(Environment):
             difficulty=self.current_scenario.difficulty,
             log_content=log_content,
         )
+        score = self._normalize_score(raw_score)
 
         self._state.done = True
         self._state.final_score = score
@@ -120,7 +154,7 @@ class IncidentResponseTriageEnvironment(Environment):
     def _force_end(self):
         self._state.done = True
         # Score as escalate — agent ran out of steps without diagnosing
-        score = compute_final_score(
+        raw_score = compute_final_score(
             action_type="escalate",
             answer="",
             ground_truth=self.current_scenario.ground_truth,
@@ -129,6 +163,7 @@ class IncidentResponseTriageEnvironment(Environment):
             difficulty=self.current_scenario.difficulty,
             log_content="",
         )
+        score = self._normalize_score(raw_score)
         self._state.final_score = score
         return self._build_observation(
             reward=score,

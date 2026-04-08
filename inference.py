@@ -291,7 +291,7 @@ async def run_single_episode(client: OpenAI, difficulty: str):
             try:
                 result = await env.step(action)
             except Exception as exc:
-                rewards.append(0.0)
+                rewards.append(0.01)
                 steps_taken = obs.step + 1
                 log_step(step=steps_taken, action=action_log_str, reward=0.0, done=False, error=str(exc))
                 break
@@ -309,6 +309,10 @@ async def run_single_episode(client: OpenAI, difficulty: str):
                 fs = getattr(obs, "final_score", None)
                 if fs is not None:
                     final_score = float(fs)
+
+                    if not rewards or rewards[-1] != final_score:
+                        rewards.append(final_score)
+
                     if final_score >= SUCCESS_SCORE_THRESHOLD:
                         success = True
                 break
@@ -323,6 +327,11 @@ async def run_single_episode(client: OpenAI, difficulty: str):
             except Exception:
                 pass
 
+    valid_score_found = any(0.0 < r < 1.0 for r in rewards)
+
+    if not valid_score_found:
+        rewards.append(0.01)
+      
     log_end(success=success, steps=steps_taken, rewards=rewards)
 
 
