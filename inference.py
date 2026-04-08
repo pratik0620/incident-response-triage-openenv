@@ -24,7 +24,7 @@ import textwrap
 from pathlib import Path
 from typing import Any, List, Optional, Tuple
 from pydantic import BaseModel
-from fastapi import FastAPI
+from fastapi import FastAPI, Request
 
 from dotenv import load_dotenv
 load_dotenv()
@@ -89,8 +89,10 @@ def clamp_score(score: float) -> float:
 app = FastAPI()
 
 class ResetRequest(BaseModel):
-    task_id: str
+    task_id: str = "default_task"
     seed: int = 42
+
+    model_config = {"extra": "allow"}
 
 async def run_episode(difficulty: str) -> float:
     env: Optional[IncidentResponseTriageEnv] = None
@@ -146,10 +148,16 @@ def health():
 
 
 @app.post("/reset")
-def reset(req: ResetRequest):
+async def reset(request: Request):
+    try:
+        body = await request.json()
+    except Exception:
+        body = {}
+    task_id = body.get("task_id") or body.get("task") or body.get("id") or "default_task"
+    seed = body.get("seed", 42)
     return {
-        "task_id": req.task_id,
-        "seed": req.seed,
+        "task_id": task_id,
+        "seed": seed,
         "observation": "Incident reported. Analyze logs, metrics and alerts."
     }
 
