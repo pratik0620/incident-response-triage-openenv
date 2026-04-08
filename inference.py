@@ -307,9 +307,6 @@ async def run_single_episode(client: OpenAI, difficulty: str):
             elif reward >= 1.0:
                 reward = 0.99
 
-            done = bool(result.done)
-            obs = result.observation
-
             log_step(step=obs.step, action=action_log_str, reward=reward, done=done, error=None)
 
             if done:

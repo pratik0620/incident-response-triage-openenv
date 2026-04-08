@@ -43,18 +43,18 @@ class IncidentResponseTriageEnvironment(Environment):
 
     @staticmethod
     def _normalize_score(score: float) -> float:
-        """Enforce strictly open (0, 1) range for final_score.
-
-        OpenEnv Phase 2 validator requires: 0 < final_score < 1.
-        This guard is applied to every path that returns a terminal score.
+        """
+        Enforce strictly open (0, 1) range for final_score.
         """
         if score is None:
             return 0.01
-        if score <= 0.0:
+
+        rounded = round(float(score), 4)
+        if rounded <= 0.0:
             return 0.01
-        if score >= 1.0:
+        if rounded >= 1.0:
             return 0.99
-        return max(0.01, min(score, 0.99))
+        return rounded
 
     def reset(
         self,
