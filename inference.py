@@ -77,6 +77,13 @@ MAX_TOKENS = int(os.getenv("INCIDENT_TRIAGE_MAX_TOKENS", "1024"))
 MAX_EPISODE_STEPS = int(os.getenv("INCIDENT_TRIAGE_MAX_EPISODE_STEPS", "64"))
 SUCCESS_SCORE_THRESHOLD = float(os.getenv("SUCCESS_SCORE_THRESHOLD", "0.5"))
 
+_SCORE_MIN = 0.001
+_SCORE_MAX = 0.999
+
+def clamp_score(score: float) -> float:
+    """Clamp a score to the open interval (0, 1) as required by the platform."""
+    return max(_SCORE_MIN, min(_SCORE_MAX, float(score)))
+
 VALID_ACTIONS = frozenset(
     {"read_logs", "check_metrics", "identify_cause", "propose_fix", "escalate"}
 )
@@ -119,14 +126,14 @@ def log_start(task: str, env: str, model: str) -> None:
 def log_step(step: int, action: str, reward: float, done: bool, error: Optional[str]) -> None:
     error_val = error.replace("\n", " ").replace("\r", " ") if error else "null"
     print(
-        f"[STEP]  step={step} action={action} reward={reward:.2f} "
+        f"[STEP]  step={step} action={action} reward={reward:.4f} "
         f"done={str(done).lower()} error={error_val}",
         flush=True,
     )
 
 
 def log_end(success: bool, steps: int, rewards: List[float]) -> None:
-    rewards_str = ",".join(f"{r:.2f}" for r in rewards)
+    rewards_str = ",".join(f"{r:.4f}" for r in rewards)
     print(
         f"[END] success={str(success).lower()} steps={steps} rewards={rewards_str}",
         flush=True,
@@ -264,12 +271,16 @@ def get_model_action(client: OpenAI, user_prompt: str) -> Tuple[IncidentResponse
     return action, raw.replace("\n", " ")[:800]
 
 
-async def run_single_episode(client: OpenAI, difficulty: str):
+async def run_single_episode(client: OpenAI, difficulty: str) -> None:
+    """Run one episode for the given difficulty and emit START/STEP/END logs."""
+
     env: Optional[IncidentResponseTriageEnv] = None
     step_rewards: List[float] = []
-    final_scores: List[float] = []
     steps_taken = 0
     success = False
+    final_score: float = _SCORE_MIN
+
+    log_start(task=difficulty, env=BENCHMARK, model=MODEL_NAME)
 
     try:
         if IMAGE_NAME:
@@ -293,27 +304,24 @@ async def run_single_episode(client: OpenAI, difficulty: str):
                 result = await env.step(action)
             except Exception as exc:
                 steps_taken = obs.step + 1
-                log_step(step=steps_taken, action=action_log_str, reward=0.01, done=False, error=str(exc))
+                log_step(step=steps_taken, action=action_log_str,
+                         reward=_SCORE_MIN, done=False, error=str(exc))
                 break
 
-            reward = float(result.reward if result.reward is not None else 0.01)
+            raw_reward = float(result.reward if result.reward is not None else 0.0)
+            clamped_reward = clamp_score(raw_reward)
+
             done = bool(result.done)
             obs = result.observation
-            step_rewards.append(reward)
+            step_rewards.append(clamped_reward)
             steps_taken = obs.step
 
-            if reward <= 0.0:
-                reward = 0.01
-            elif reward >= 1.0:
-                reward = 0.99
-
-            log_step(step=obs.step, action=action_log_str, reward=reward, done=done, error=None)
+            log_step(step=obs.step, action=action_log_str, reward=clamped_reward, done=done, error=None)
 
             if done:
-                fs = getattr(obs, "final_score", None)
-                if fs is not None:
-                    final_score = float(fs)
-                    final_scores.append(final_score)
+                raw_fs = getattr(obs, "final_score", None)
+                if raw_fs is not None:
+                    final_score = clamp_score(float(raw_fs))
                     if final_score >= SUCCESS_SCORE_THRESHOLD:
                         success = True
                 break
@@ -328,10 +336,7 @@ async def run_single_episode(client: OpenAI, difficulty: str):
             except Exception:
                 pass
 
-    if not final_scores:
-        final_scores = [0.01]
-
-    log_end(success=success, steps=steps_taken, rewards=final_scores)
+    log_end(success=success, steps=steps_taken, rewards=[final_score])
 
 
 async def main() -> None:
