@@ -45,7 +45,7 @@ def grade_categorization(answer: str, ground_truth: "GroundTruth") -> float:
         float in [0.0, 1.0] — higher is better.
     """
     if not answer or not answer.strip():
-        return 0.0
+        return 0.01
 
     answer_lower = answer.lower()
     score = 0.0

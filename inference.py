@@ -79,8 +79,10 @@ MAX_TOKENS = int(os.getenv("INCIDENT_TRIAGE_MAX_TOKENS", "1024"))
 MAX_EPISODE_STEPS = int(os.getenv("INCIDENT_TRIAGE_MAX_EPISODE_STEPS", "64"))
 SUCCESS_SCORE_THRESHOLD = float(os.getenv("SUCCESS_SCORE_THRESHOLD", "0.5"))
 
-_SCORE_MIN = 0.001
-_SCORE_MAX = 0.999
+# Platform validator requires scores strictly between 0 and 1
+# (not 0.0 and not 1.0). Use a safe open-interval clamp.
+_SCORE_MIN = 0.01
+_SCORE_MAX = 0.99
 
 def clamp_score(score: float) -> float:
     """Clamp a score to the open interval (0, 1) as required by the platform."""
@@ -170,23 +172,21 @@ def _grading_logic(difficulty: str) -> float:
 
 @app.get("/grade/task_easy")
 def grade_easy():
-    score = _grading_logic("easy")
+    score = clamp_score(_grading_logic("easy"))
     return {"score": score, "reward": score}
 
 
 @app.get("/grade/task_medium")
 def grade_medium():
-    score = _grading_logic("medium")
+    score = clamp_score(_grading_logic("medium"))
     return {"score": score, "reward": score}
 
 
 @app.get("/grade/task_hard")
 def grade_hard():
-    score = _grading_logic("hard")
+    score = clamp_score(_grading_logic("hard"))
     return {"score": score, "reward": score}
 
-
-# ── Logging helpers ─────────────────────────────────────────────────────────
 
 VALID_ACTIONS = frozenset(
     {"read_logs", "check_metrics", "identify_cause", "propose_fix", "escalate"}

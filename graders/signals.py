@@ -4,7 +4,7 @@ Multi-Signal Grader — six independent scoring signals (A through F).
 Every function in this file:
   - Takes only strings and GroundTruth fields as input
   - Is 100% deterministic (no randomness, no external calls)
-  - Returns a float in [0.0, 1.0]
+  - Returns a float strictly in (0.0, 1.0) — never exactly 0.0 or 1.0
   - Has clear, auditable scoring logic
 
 Signal overview:
@@ -32,6 +32,16 @@ from .synonyms import (
 if TYPE_CHECKING:
     from ..models import GroundTruth
 
+# Hard bounds — platform requires strictly open interval (0, 1).
+# Every signal function must pass its return value through _clamp().
+_SIG_MIN = 0.01
+_SIG_MAX = 0.99
+
+
+def _clamp(score: float) -> float:
+    """Enforce strictly open (0, 1) on any signal score."""
+    return round(max(_SIG_MIN, min(float(score), _SIG_MAX)), 4)
+
 
 # ─────────────────────────────────────────────────────────────────────────────
 # SIGNAL A — Root Cause Score
@@ -41,46 +51,32 @@ def root_cause_signal(answer: str, ground_truth: "GroundTruth") -> float:
     """
     Evaluate whether agent identified the correct service and failure type.
 
-    Scoring:
-        Exact match (service + type fully identified)         → 1.0
-        Service correct + partial cause keywords             → 0.5–0.9
-        Only cause type correct, service wrong               → 0.3–0.5
-        Completely wrong                                     → 0.0
-
     Uses synonym expansion so "heap overflow" matches "memory_leak".
     """
     if not answer or not answer.strip():
-        return 0.0
+        return _clamp(0.0)
 
     answer_lower = answer.lower()
     score = 0.0
 
-    # ── Service match (0.5 pts) ───────────────────────────────────────────────
     service = ground_truth.root_cause_service.lower()
-    # Accept partial service name match (e.g. "payment" matches "payment-service")
     service_parts = [p for p in service.replace("-", " ").replace("_", " ").split() if len(p) > 3]
     service_hit = service in answer_lower or any(p in answer_lower for p in service_parts)
     if service_hit:
         score += 0.5
 
-    # ── Cause type match (0.5 pts, proportional via synonym expansion) ────────
     all_cause_terms = get_cause_synonyms(ground_truth.root_cause_type)
-
-    # Multi-word phrases score more than single words
     phrase_hits = sum(1 for term in all_cause_terms if " " in term and term in answer_lower)
     word_hits   = sum(1 for term in all_cause_terms if " " not in term and term in answer_lower)
 
     if phrase_hits >= 1:
-        # At least one full phrase matched
         score += 0.5
     elif word_hits >= 2:
-        # Multiple individual keywords matched
         score += 0.4
     elif word_hits == 1:
-        # One keyword matched — partial credit
         score += 0.25
 
-    return round(min(score, 1.0), 4)
+    return _clamp(score)
 
 
 # ─────────────────────────────────────────────────────────────────────────────
@@ -92,15 +88,12 @@ def fix_quality_signal(answer: str, ground_truth: "GroundTruth") -> float:
     Evaluate fix completeness using tiered keyword matching.
 
     Tiers (defined per cause type in synonyms.py):
-        tier_1: superficial fix (restart, redeploy)      → 0.3
-        tier_2: correct functional fix                   → 0.7
-        tier_3: correct + preventive fix                 → 1.0
-
-    Penalty: if agent only gives a superficial fix AND root cause
-             is not identified, score is capped at 0.2.
+        tier_1: superficial fix (restart, redeploy)      -> 0.3
+        tier_2: correct functional fix                   -> 0.7
+        tier_3: correct + preventive fix                 -> 1.0 (clamped to 0.99)
     """
     if not answer or not answer.strip():
-        return 0.0
+        return _clamp(0.0)
 
     answer_lower = answer.lower()
 
@@ -110,14 +103,12 @@ def fix_quality_signal(answer: str, ground_truth: "GroundTruth") -> float:
         ground_truth.correct_fix,
     )
 
-    # Penalty: superficial fix with no cause understanding
     if tier_score == 0.3:
-        # Check if agent at least named the service
         service = ground_truth.root_cause_service.lower()
         if service not in answer_lower:
-            return 0.1  # Pure restart guess with no diagnosis
+            return _clamp(0.1)
 
-    return round(tier_score, 4)
+    return _clamp(tier_score)
 
 
 # ─────────────────────────────────────────────────────────────────────────────
@@ -127,26 +118,17 @@ def fix_quality_signal(answer: str, ground_truth: "GroundTruth") -> float:
 def reasoning_signal(answer: str, ground_truth: "GroundTruth") -> float:
     """
     Evaluate whether agent provides a logical causal reasoning chain.
-
-    Scoring:
-        Strong causal chain with evidence phrases     → 0.8–1.0
-        Some reasoning vocabulary, weak chain        → 0.4–0.7
-        No reasoning structure                       → 0.0–0.3
-
-    Pattern detection is purely string-based (no NLP library).
     """
     if not answer or not answer.strip():
-        return 0.0
+        return _clamp(0.0)
 
     answer_lower = answer.lower()
 
-    # Count reasoning chain markers
     chain_hits = sum(1 for p in REASONING_CHAIN_PATTERNS if p in answer_lower)
 
-    # Check for explicit causal structure: "X → Y" or "X caused Y" or "X because Y"
     has_causal_connector = any(c in answer_lower for c in [
         "because", "caused by", "triggered by", "due to",
-        "leading to", "resulting in", "→", "->",
+        "leading to", "resulting in", "->", "->",
     ])
     has_evidence_phrase = any(e in answer_lower for e in [
         "the logs show", "log indicates", "based on the logs",
@@ -158,9 +140,8 @@ def reasoning_signal(answer: str, ground_truth: "GroundTruth") -> float:
         "diagnosed as", "conclusion",
     ])
 
-    # Score based on combinations
     score = 0.0
-    score += min(chain_hits * 0.08, 0.4)   # up to 0.4 from raw pattern hits
+    score += min(chain_hits * 0.08, 0.4)
 
     if has_causal_connector:
         score += 0.2
@@ -169,12 +150,11 @@ def reasoning_signal(answer: str, ground_truth: "GroundTruth") -> float:
     if has_conclusion_phrase:
         score += 0.15
 
-    # Length heuristic: very short answers can't have good reasoning
     word_count = len(answer.split())
     if word_count < 15:
-        score *= 0.4  # heavy penalty for one-liners
+        score *= 0.4
 
-    return round(min(score, 1.0), 4)
+    return _clamp(score)
 
 
 # ─────────────────────────────────────────────────────────────────────────────
@@ -188,33 +168,18 @@ def faithfulness_signal(
 ) -> float:
     """
     Evaluate whether agent reasoning is grounded in actual log content.
-
-    High score: agent uses signals that ARE present in logs.
-    Penalty:    agent introduces causes NOT present in logs (hallucination).
-
-    Args:
-        answer:       Agent's free-text response.
-        ground_truth: Scenario ground truth.
-        log_content:  All log/alert text the agent had access to (joined string).
-                      If empty, this signal returns 0.5 (neutral — can't evaluate).
-
-    Scoring:
-        Grounded signals present in both logs and answer   → +score
-        Agent claims cause not in logs                     → -penalty
     """
     if not answer or not answer.strip():
-        return 0.0
+        return _clamp(0.0)
 
-    # If no logs provided to compare against, return neutral
     if not log_content or not log_content.strip():
-        return 0.5
+        return _clamp(0.5)
 
-    answer_lower   = answer.lower()
-    log_lower      = log_content.lower()
+    answer_lower = answer.lower()
+    log_lower    = log_content.lower()
 
-    score      = 0.0
-    total_hits = 0
-    grounded   = 0
+    total_hits   = 0
+    grounded     = 0
     hallucinated = 0
 
     for kw in LOG_SIGNAL_KEYWORDS:
@@ -226,25 +191,21 @@ def faithfulness_signal(
                 hallucinated += 1
 
     if total_hits == 0:
-        # Agent didn't reference any observable signals — neutral
-        return 0.4
+        return _clamp(0.4)
 
-    # Grounded fraction
     grounded_ratio = grounded / total_hits
     score = 0.7 * grounded_ratio
 
-    # Bonus: agent used log signals that directly correspond to root cause
-    cause_synonyms = get_cause_synonyms(ground_truth.root_cause_type)
+    cause_synonyms  = get_cause_synonyms(ground_truth.root_cause_type)
     cause_in_logs   = any(term in log_lower   for term in cause_synonyms)
     cause_in_answer = any(term in answer_lower for term in cause_synonyms)
     if cause_in_logs and cause_in_answer:
-        score += 0.3  # Agent correctly connected log signal to root cause
+        score += 0.3
 
-    # Penalty: hallucinated causes (strong signals not in logs)
     hallucination_penalty = min(hallucinated * 0.15, 0.4)
     score = max(0.0, score - hallucination_penalty)
 
-    return round(min(score, 1.0), 4)
+    return _clamp(score)
 
 
 # ─────────────────────────────────────────────────────────────────────────────
@@ -255,28 +216,21 @@ def noise_signal(answer: str, ground_truth: "GroundTruth") -> float:
     """
     Evaluate whether agent correctly ignored red-herring services/signals.
 
-    Scoring:
-        No red herrings mentioned                    → 1.0
-        1 red herring mentioned                      → 0.5 penalty
-        2+ red herrings mentioned                    → heavy penalty
-        Over-guessing phrases detected               → additional penalty
-
-    Bonus: if agent explicitly says a red herring is NOT the cause,
-           that shows good reasoning and is rewarded.
+    NOTE: score starts at 0.98 (not 1.0) to ensure it never reaches exactly
+    1.0 even when the agent perfectly ignores all red herrings.
     """
     if not answer or not answer.strip():
-        return 0.5  # neutral — we can't tell
+        return _clamp(0.5)
 
     answer_lower = answer.lower()
-    score = 1.0
+    # Start below 1.0 so perfect performance returns 0.98 (safely clamped to 0.99)
+    score = 0.98
 
     red_herrings = ground_truth.red_herrings or []
 
     for rh in red_herrings:
         rh_lower = rh.lower()
         if rh_lower in answer_lower:
-            # Check if agent explicitly ruled it out
-            # e.g. "frontend-service is not the cause"
             ruled_out = any(
                 phrase in answer_lower
                 for phrase in (
@@ -287,18 +241,17 @@ def noise_signal(answer: str, ground_truth: "GroundTruth") -> float:
                 )
             )
             if ruled_out:
-                score += 0.05  # Small bonus for explicit ruling out
+                score += 0.01
             else:
-                score -= 0.3   # Agent incorrectly blamed this service
+                score -= 0.3
 
-    # Over-guessing penalty
     over_guess_count = sum(1 for p in OVER_GUESS_PHRASES if p in answer_lower)
     if over_guess_count >= 3:
         score -= 0.3
     elif over_guess_count >= 1:
         score -= 0.1
 
-    return round(max(0.0, min(score, 1.0)), 4)
+    return _clamp(score)
 
 
 # ─────────────────────────────────────────────────────────────────────────────
@@ -310,33 +263,31 @@ def efficiency_signal(steps_used: int, max_steps: int) -> float:
     Evaluate how efficiently the agent reached its conclusion.
 
     Scoring curve (non-linear — rewards decisiveness):
-        ≤ 25% of budget used   → 1.0
-        ≤ 50% of budget used   → 0.8
-        ≤ 75% of budget used   → 0.6
-        ≤ 90% of budget used   → 0.4
-        100% of budget used    → 0.2
-        > budget (capped)      → 0.0
+        <= 25% of budget used  -> 0.99
+        <= 50% of budget used  -> 0.80
+        <= 75% of budget used  -> 0.60
+        <= 90% of budget used  -> 0.40
+        100% of budget used    -> 0.20
+        > budget (capped)      -> 0.01
 
-    A non-linear curve is used (vs the old linear bonus) because real
-    incident responders who resolve issues in 2 of 20 steps are
-    meaningfully better than those who need 10 of 20 steps.
+    NOTE: 1.0 and 0.0 are never returned — all values pass through _clamp().
     """
     if max_steps <= 0:
-        return 0.5  # neutral — no budget defined
+        return _clamp(0.5)
 
     ratio = steps_used / max_steps
 
-    if ratio <= 0.0:
-        return 1.0
-    elif ratio <= 0.25:
-        return 1.0
+    if ratio <= 0.25:
+        raw = 0.99
     elif ratio <= 0.50:
-        return 0.8
+        raw = 0.80
     elif ratio <= 0.75:
-        return 0.6
+        raw = 0.60
     elif ratio <= 0.90:
-        return 0.4
+        raw = 0.40
     elif ratio <= 1.0:
-        return 0.2
+        raw = 0.20
     else:
-        return 0.0  # Went over budget
+        raw = 0.01
+
+    return _clamp(raw)
