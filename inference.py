@@ -266,7 +266,8 @@ def get_model_action(client: OpenAI, user_prompt: str) -> Tuple[IncidentResponse
 
 async def run_single_episode(client: OpenAI, difficulty: str):
     env: Optional[IncidentResponseTriageEnv] = None
-    rewards: List[float] = []
+    step_rewards: List[float] = []
+    final_scores: List[float] = []
     steps_taken = 0
     success = False
 
@@ -291,17 +292,23 @@ async def run_single_episode(client: OpenAI, difficulty: str):
             try:
                 result = await env.step(action)
             except Exception as exc:
-                rewards.append(0.01)
                 steps_taken = obs.step + 1
-                log_step(step=steps_taken, action=action_log_str, reward=0.0, done=False, error=str(exc))
+                log_step(step=steps_taken, action=action_log_str, reward=0.01, done=False, error=str(exc))
                 break
 
-            reward = float(result.reward if result.reward is not None else 0.0)
+            reward = float(result.reward if result.reward is not None else 0.01)
             done = bool(result.done)
             obs = result.observation
-
-            rewards.append(reward)
+            step_rewards.append(reward)
             steps_taken = obs.step
+
+            if reward <= 0.0:
+                reward = 0.01
+            elif reward >= 1.0:
+                reward = 0.99
+
+            done = bool(result.done)
+            obs = result.observation
 
             log_step(step=obs.step, action=action_log_str, reward=reward, done=done, error=None)
 
@@ -309,10 +316,7 @@ async def run_single_episode(client: OpenAI, difficulty: str):
                 fs = getattr(obs, "final_score", None)
                 if fs is not None:
                     final_score = float(fs)
-
-                    if not rewards or rewards[-1] != final_score:
-                        rewards.append(final_score)
-
+                    final_scores.append(final_score)
                     if final_score >= SUCCESS_SCORE_THRESHOLD:
                         success = True
                 break
@@ -327,12 +331,10 @@ async def run_single_episode(client: OpenAI, difficulty: str):
             except Exception:
                 pass
 
-    valid_score_found = any(0.0 < r < 1.0 for r in rewards)
+    if not final_scores:
+        final_scores = [0.01]
 
-    if not valid_score_found:
-        rewards.append(0.01)
-      
-    log_end(success=success, steps=steps_taken, rewards=rewards)
+    log_end(success=success, steps=steps_taken, rewards=final_scores)
 
 
 async def main() -> None:

@@ -105,7 +105,7 @@ class IncidentResponseTriageEnvironment(Environment):
         if action_type in ["identify_cause", "propose_fix", "escalate"]:
             return self._handle_terminal(action_type, action)
 
-        reward = -0.02
+        reward = 0.01
 
         if self._state.step >= self._state.max_steps:
             return self._force_end()
