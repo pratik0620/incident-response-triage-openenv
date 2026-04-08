@@ -23,6 +23,8 @@ import re
 import textwrap
 from pathlib import Path
 from typing import Any, List, Optional, Tuple
+from pydantic import BaseModel
+from fastapi import FastAPI
 
 from dotenv import load_dotenv
 load_dotenv()
@@ -83,6 +85,100 @@ _SCORE_MAX = 0.999
 def clamp_score(score: float) -> float:
     """Clamp a score to the open interval (0, 1) as required by the platform."""
     return max(_SCORE_MIN, min(_SCORE_MAX, float(score)))
+
+app = FastAPI()
+
+class ResetRequest(BaseModel):
+    task_id: str
+    seed: int = 42
+
+async def run_episode(difficulty: str) -> float:
+    env: Optional[IncidentResponseTriageEnv] = None
+    final_score: float = _SCORE_MIN
+
+    try:
+        env = IncidentResponseTriageEnv(base_url=ENV_BASE_URL)
+        await env.connect()
+
+        result = await env.reset(difficulty=difficulty)
+        obs = result.observation
+
+        client = OpenAI(base_url=API_BASE_URL, api_key=API_KEY)
+
+        for _ in range(MAX_EPISODE_STEPS):
+            if obs.done:
+                break
+
+            user_prompt = build_observation_prompt(obs)
+            action, _ = get_model_action(client, user_prompt)
+
+            result = await env.step(action)
+            obs = result.observation
+
+            if result.done:
+                fs = getattr(obs, "final_score", None)
+                if fs is not None:
+                    final_score = clamp_score(fs)
+                break
+
+    except Exception as e:
+        print(f"[ERROR] Episode failed: {e}")
+
+    finally:
+        if env:
+            try:
+                await env.close()
+            except:
+                pass
+
+    return clamp_score(final_score)
+
+
+def run_sync_episode(difficulty: str) -> float:
+    return asyncio.run(run_episode(difficulty))
+
+
+# ── FastAPI routes ──────────────────────────────────────────────────────────
+
+@app.get("/health")
+def health():
+    return {"status": "healthy"}
+
+
+@app.post("/reset")
+def reset(req: ResetRequest):
+    return {
+        "task_id": req.task_id,
+        "seed": req.seed,
+        "observation": "Incident reported. Analyze logs, metrics and alerts."
+    }
+
+
+def _grading_logic(difficulty: str) -> float:
+    """Run a full episode for the given difficulty and return a clamped score."""
+    score = run_sync_episode(difficulty)
+    return clamp_score(score)
+
+
+@app.get("/grade/task_easy")
+def grade_easy():
+    score = _grading_logic("easy")
+    return {"score": score, "reward": score}
+
+
+@app.get("/grade/task_medium")
+def grade_medium():
+    score = _grading_logic("medium")
+    return {"score": score, "reward": score}
+
+
+@app.get("/grade/task_hard")
+def grade_hard():
+    score = _grading_logic("hard")
+    return {"score": score, "reward": score}
+
+
+# ── Logging helpers ─────────────────────────────────────────────────────────
 
 VALID_ACTIONS = frozenset(
     {"read_logs", "check_metrics", "identify_cause", "propose_fix", "escalate"}

@@ -5,7 +5,7 @@ colorFrom: red
 colorTo: yellow
 sdk: docker
 pinned: false
-app_port: 8000
+app_port: 7860
 tags:
   - openenv
   - incident-response
@@ -147,6 +147,15 @@ pip install -e ".[dev]"
 uvicorn server.app:app --host 0.0.0.0 --port 8000
 ```
 
+**Run inference API (HF-compatible):**
+```bash
+export HF_TOKEN=your_token
+export API_BASE_URL=https://router.huggingface.co/v1
+export MODEL_NAME=Qwen/Qwen2.5-7B-Instruct
+export ENV_BASE_URL=http://localhost:8000
+uvicorn inference:app --host 0.0.0.0 --port 7860
+```
+
 **Run baseline inference:**
 ```bash
 export HF_TOKEN=your_token
@@ -159,7 +168,15 @@ python inference.py
 **Run via Docker:**
 ```bash
 docker build -t incident-response-env:local .
-docker run -p 8000:8000 incident-response-env:local
+docker run -p 7860:7860 incident-response-env:local
+```
+
+**Test Endpoints:**
+```bash
+curl http://localhost:7860/health
+curl http://localhost:7860/grade/task_easy
+curl http://localhost:7860/grade/task_medium
+curl http://localhost:7860/grade/task_hard
 ```
 
 ---
