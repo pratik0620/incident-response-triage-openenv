@@ -348,7 +348,6 @@ async def main() -> None:
     difficulties = ["easy", "medium", "hard"]
 
     for diff in difficulties:
-        log_start(task=diff, env=BENCHMARK, model=MODEL_NAME)
         await run_single_episode(client, diff)
 
 
