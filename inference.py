@@ -150,30 +150,36 @@ SYSTEM_PROMPT = textwrap.dedent(
     """
     You are an on-call SRE triaging a microservice incident. You choose one action per turn.
 
-    ALLOWED ACTIONS:
-    - read_logs      — Fetch log entries to gather evidence. (episode continues)
-    - check_metrics  — Fetch CPU/Mem/Error metrics. (episode continues)
+    Allowed action_type values:
+    - read_logs      — gather signal (small step cost; episode continues)
+    - check_metrics  — gather signal (small step cost; episode continues)
+    - identify_cause — terminal: state the root cause ONLY when you cannot determine a fix;
+                       "service" MUST be the faulty service; "answer" MUST describe the root cause.
+    - propose_fix    — terminal: PREFERRED over identify_cause when you have enough signal;
+                       "service" MUST be the exact name of the faulty service;
+                       "answer" MUST be a detailed string containing: (1) one specific root cause,
+                       and (2) ONE concrete fix command or config change — not alternatives with "or".
+    - escalate       — terminal: use ONLY when you have exhausted read_logs AND check_metrics
+                       and still cannot diagnose; always worse reward than propose_fix
+
+    DECISION POLICY (follow this order):
+    1. If you have not yet called read_logs → call read_logs
+    2. If you have not yet called check_metrics → call check_metrics
+    3. If you now have enough evidence to propose a concrete fix → use propose_fix (PREFERRED)
+    4. If you have evidence of root cause but no actionable fix → use identify_cause
+    5. If after both read_logs AND check_metrics you still have no diagnosis → use escalate
+
+    NEVER use identify_cause if you can propose a fix.
+    NEVER escalate without first calling both read_logs and check_metrics.
+
+    REWARD HIERARCHY (higher is better):
+    propose_fix (correct) > identify_cause (correct) > escalate > propose_fix (wrong)
     
-    TERMINAL ACTIONS (Choose wisely):
-    - propose_fix    — (RECOMMENDED for High Score) Provide the root cause AND a concrete fix.
-                       Use this when you are confident in your diagnosis.
-    - identify_cause — (DIAGNOSIS ONLY) State the root cause. 
-                       Use this for Easy tasks or when you know the cause but lack a clear fix.
-    - escalate       — (SAFETY HAND-OFF) Use this if you have exhausted most of your budget 
-                       without a clear hypothesis, or if you find yourself repeating 
-                       actions without gaining new insights.
-
-    Respond with a single JSON object only (no markdown), keys:
-      "action_type"  (string, required)
-      "reasoning"    (string, required)
-      "answer"       (string or null) — required for identify_cause / propose_fix
-      "service"      (string or null) — optional focus service
-
-    --- CRITICAL GUIDELINES ---
-    1. PROPOSE RESOLUTION: On Medium and Hard tasks, you MUST aim for 'propose_fix'. Simply identifying the cause will yield partial credit.
-    2. CAUSAL CHAIN: Use phrases like "the logs show...", "due to...", "resulting in..." in your reasoning.
-    3. EVIDENCE GROUNDING: Do not hallucinate. Only state what is supported by Logs, Metrics, or Alerts.
-    4. ESCALATE IF STUCK: If you have exhausted 80% of your step budget without a clear hypothesis, use 'escalate'.
+    Always aim for propose_fix when you have actionable evidence.
+    
+    If after examining both logs and metrics the root cause remains unclear or contradictory,
+    you MUST use escalate rather than guessing with identify_cause.
+    ...
     """
 ).strip()
 
@@ -212,16 +218,38 @@ def _metric_line(m: Any) -> str:
 
 def _alert_line(a: Any) -> str:
     if isinstance(a, dict):
-        return f"  {a.get('alert_id')} {a.get('severity')} {a.get('service')}: {a.get('message')}"
-    return f"  {a.alert_id} {a.severity} {a.service}: {a.message}"
+        return f"  [{a.get('fired_at', '')}] {a.get('alert_id')} {a.get('severity')} {a.get('service')}: {a.get('message')}"
+    return f"  [{getattr(a, 'fired_at', '')}] {a.alert_id} {a.severity} {a.service}: {a.message}"
 
 
 def build_observation_prompt(observation: Any) -> str:
-    logs = "\n".join(_log_entry_line(x) for x in observation.logs[:40])
-    metrics = "\n".join(_metric_line(x) for x in observation.metrics[:30])
     alerts = "\n".join(_alert_line(x) for x in observation.alerts[:20])
     prev = observation.previous_actions[-12:] if observation.previous_actions else []
     prev_s = ", ".join(prev) if prev else "(none)"
+
+    # Derive explicit next-step guidance
+    has_logs = "read_logs" in prev
+    has_metrics = "check_metrics" in prev
+
+    logs = "\n".join(_log_entry_line(x) for x in observation.logs[:40]) if has_logs else "(Logs hidden. You MUST call 'read_logs' action to view them.)"
+    metrics = "\n".join(_metric_line(x) for x in observation.metrics[:30]) if has_metrics else "(Metrics hidden. You MUST call 'check_metrics' action to view them.)"
+    if has_logs and has_metrics:
+        next_step_hint = (
+            "You have gathered both logs and metrics. "
+            "You MUST now choose a terminal action: propose_fix (preferred), "
+            "identify_cause, or escalate. Do NOT call read_logs or check_metrics again."
+        )
+    elif has_logs and not has_metrics:
+        next_step_hint = (
+            "You have read logs but NOT yet checked metrics. "
+            "Call check_metrics next before making any terminal decision."
+        )
+    elif not has_logs:
+        next_step_hint = (
+            "You have not yet read logs. Call read_logs first."
+        )
+    else:
+        next_step_hint = "You should gather signal before making a terminal decision."
 
     return textwrap.dedent(
         f"""
@@ -233,6 +261,8 @@ def build_observation_prompt(observation: Any) -> str:
 
         Recent actions (types only): {prev_s}
 
+        >>> NEXT STEP GUIDANCE: {next_step_hint} <
+
         Logs:
         {logs}
 
@@ -242,8 +272,12 @@ def build_observation_prompt(observation: Any) -> str:
         Alerts:
         {alerts}
 
-        Current Goal: Gather enough signal to use 'propose_fix'. If you are stuck or budget is nearly exhausted, use 'escalate'.
-        Respond ONLY with a valid JSON object.
+        Respond ONLY with a valid JSON object. Do not include explanations, markdown, or extra text.
+        Required keys:
+        - "action_type": string, your chosen action
+        - "reasoning": string, your thought process
+        - "service": string, the exact target service name
+        - "answer": string, full detailed text for your answer/fix
         """
     ).strip()
 
@@ -286,10 +320,18 @@ def parse_model_to_action(raw: str) -> IncidentResponseTriageAction:
     if service is not None:
         service = str(service).strip() or None
 
+    full_answer_text = None
+    if answer is not None and reasoning != "no reasoning provided":
+        full_answer_text = f"Reasoning:\n{reasoning}\n\nProposed Fix/Cause:\n{answer}"
+    elif answer is not None:
+        full_answer_text = answer
+    elif reasoning != "no reasoning provided":
+        full_answer_text = f"Reasoning:\n{reasoning}"
+
     return IncidentResponseTriageAction(
         action_type=action_type,  # type: ignore[arg-type]
         reasoning=reasoning,
-        answer=answer,
+        answer=full_answer_text,
         service=service,
     )
 

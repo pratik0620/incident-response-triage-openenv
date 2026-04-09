@@ -186,10 +186,10 @@ curl http://localhost:7860/grade/task_hard
 Evaluated using `Qwen/Qwen2.5-7B-Instruct` via HuggingFace router.
 
 | Difficulty | Final Score | Steps | Success |
-|---|------|---|------|
-| Easy | 0.88 | 3 | true |
-| Medium | 0.61 | 3 | true |
-| Hard | 0.56 | 3 | true |
+|---|-------------|---|------|
+| Easy | 0.88        | 3 | true |
+| Medium | 0.69        | 3 | true |
+| Hard | 0.56        | 3 | true |
 
 ---
 
