@@ -23,11 +23,6 @@ import re
 import textwrap
 from pathlib import Path
 from typing import Any, List, Optional, Tuple
-from pydantic import BaseModel
-from fastapi import FastAPI, Request
-
-from dotenv import load_dotenv
-load_dotenv()
 
 from openai import OpenAI
 
@@ -64,8 +59,8 @@ from incident_response_triage_env.models import IncidentResponseTriageAction  # 
 
 
 #==========Configuration (all overridable via environment variables)==========#
-API_KEY = os.getenv("HF_TOKEN") or os.getenv("API_KEY") or os.getenv("OPENAI_API_KEY")
-API_BASE_URL = os.getenv("API_BASE_URL", "https://router.huggingface.co/v1")
+API_KEY = os.environ["API_KEY"]
+API_BASE_URL = os.environ["API_BASE_URL"]
 MODEL_NAME = os.getenv("MODEL_NAME", "Qwen/Qwen2.5-7B-Instruct")
 IMAGE_NAME = os.getenv("IMAGE_NAME") or os.getenv("LOCAL_IMAGE_NAME")
 ENV_BASE_URL = os.getenv("ENV_BASE_URL", "http://localhost:8000")
@@ -92,14 +87,6 @@ def clamp_score(score: float) -> float:
     if val >= _SCORE_MAX:
         return _SCORE_MAX
     return round(val, 4)
-
-app = FastAPI()
-
-class ResetRequest(BaseModel):
-    task_id: str = "default_task"
-    seed: int = 42
-
-    model_config = {"extra": "allow"}
 
 async def run_episode(difficulty: str) -> float:
     env: Optional[IncidentResponseTriageEnv] = None
@@ -147,50 +134,12 @@ def run_sync_episode(difficulty: str) -> float:
     return asyncio.run(run_episode(difficulty))
 
 
-# ── FastAPI routes ──────────────────────────────────────────────────────────
-
-@app.get("/health")
-def health():
-    return {"status": "healthy"}
-
-
-@app.post("/reset")
-async def reset(request: Request):
-    try:
-        body = await request.json()
-    except Exception:
-        body = {}
-    task_id = body.get("task_id") or body.get("task") or body.get("id") or "default_task"
-    seed = body.get("seed", 42)
-    return {
-        "task_id": task_id,
-        "seed": seed,
-        "observation": "Incident reported. Analyze logs, metrics and alerts."
-    }
-
+# ── Grading Logic ────────────────────────────────────────────────────────────
 
 def _grading_logic(difficulty: str) -> float:
     """Run a full episode for the given difficulty and return a clamped score."""
     score = run_sync_episode(difficulty)
     return clamp_score(score)
-
-
-@app.get("/grade/task_easy")
-def grade_easy():
-    score = clamp_score(_grading_logic("easy"))
-    return {"score": score, "reward": score}
-
-
-@app.get("/grade/task_medium")
-def grade_medium():
-    score = clamp_score(_grading_logic("medium"))
-    return {"score": score, "reward": score}
-
-
-@app.get("/grade/task_hard")
-def grade_hard():
-    score = clamp_score(_grading_logic("hard"))
-    return {"score": score, "reward": score}
 
 
 VALID_ACTIONS = frozenset(
@@ -241,12 +190,9 @@ def log_step(step: int, action: str, reward: float, done: bool, error: Optional[
     )
 
 
-def log_end(success: bool, steps: int, rewards: List[float]) -> None:
-    rewards_str = ",".join(f"{r:.4f}" for r in rewards)
-    print(
-        f"[END] success={str(success).lower()} steps={steps} rewards={rewards_str}",
-        flush=True,
-    )
+def log_end(difficulty: str, final_score: float, steps_taken: int) -> None:
+    final_score = max(_SCORE_MIN, min(_SCORE_MAX, float(final_score)))
+    print(f"[END] task={difficulty} score={final_score:.4f} steps={steps_taken}", flush=True)
 
 
 def _log_entry_line(entry: Any) -> str:
@@ -445,7 +391,7 @@ async def run_single_episode(client: OpenAI, difficulty: str) -> None:
             except Exception:
                 pass
 
-    log_end(success=success, steps=steps_taken, rewards=[final_score])
+    log_end(difficulty=difficulty, final_score=final_score, steps_taken=steps_taken)
 
 
 async def main() -> None:

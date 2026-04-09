@@ -5,12 +5,6 @@ description: "Incident response triage environment"
 author: "Pratik Morkar, Nishant Ninawe, Surabhi Nikam"
 type: space
 
-endpoints:
-  health: /health
-  reset:  /reset
-  step:   /step
-  state:  /state
-
 tasks:
   - id: task_easy
     description: "Easy incident triage task"
@@ -23,6 +17,6 @@ tasks:
     difficulty: hard
 
 scoring:
+  type: llm
   reward_range: [0.0, 1.0]
-  success_threshold: 0.5
-  score_formula: mean(step_rewards)
+  success_threshold: 0.5
