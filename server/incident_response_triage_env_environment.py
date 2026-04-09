@@ -76,11 +76,8 @@ class IncidentResponseTriageEnvironment(Environment):
                         so that the HuggingFace platform's task-based resets
                         (``{"task_id": "easy"}``) resolve correctly.
         """
-        # CRITICAL FIX: Strip 'task_' prefix from platform-provided task_id
+        # task_id mirrors difficulty in this environment (easy/medium/hard)
         effective_difficulty = task_id if task_id is not None else difficulty
-        if effective_difficulty and effective_difficulty.startswith("task_"):
-            effective_difficulty = effective_difficulty[5:]
-
         self.current_scenario = load_random_scenario(effective_difficulty)
 
         self._state = IncidentResponseTriageState(
@@ -91,7 +88,7 @@ class IncidentResponseTriageEnvironment(Environment):
             done=False,
         )
 
-        return self._build_observation(reward=0.0001, done=False)
+        return self._build_observation(reward=0.01, done=False)
 
 
     def step(self, action: IncidentResponseTriageAction) -> IncidentResponseTriageObservation:  # type: ignore[override]
@@ -100,7 +97,7 @@ class IncidentResponseTriageEnvironment(Environment):
 
         if self._state.done:
             return self._build_observation(
-                reward=self._normalize_score(self._state.final_score or 0.0001),
+                reward=self._normalize_score(self._state.final_score or 0.01),
                 done=True,
                 msg="Episode ended.",
                 final_score=self._normalize_score(self._state.final_score or 0.01),
@@ -114,7 +111,7 @@ class IncidentResponseTriageEnvironment(Environment):
         if action_type in ["identify_cause", "propose_fix", "escalate"]:
             return self._handle_terminal(action_type, action)
 
-        reward = 0.0001
+        reward = 0.01
 
         if self._state.step >= self._state.max_steps:
             return self._force_end()
