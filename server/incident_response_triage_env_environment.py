@@ -76,8 +76,12 @@ class IncidentResponseTriageEnvironment(Environment):
                         so that the HuggingFace platform's task-based resets
                         (``{"task_id": "easy"}``) resolve correctly.
         """
-        # task_id mirrors difficulty in this environment (easy/medium/hard)
+        # task_id mirrors difficulty in this environment (easy/medium/hard).
+        # OpenEnv Phase 2 testing passes the verbatim task id (e.g. "task_easy").
         effective_difficulty = task_id if task_id is not None else difficulty
+        if effective_difficulty and effective_difficulty.startswith("task_"):
+            effective_difficulty = effective_difficulty[5:]
+            
         self.current_scenario = load_random_scenario(effective_difficulty)
 
         self._state = IncidentResponseTriageState(
