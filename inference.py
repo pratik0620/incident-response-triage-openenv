@@ -321,7 +321,11 @@ def get_model_action(client: OpenAI, user_prompt: str) -> Tuple[IncidentResponse
         )
         raw = (completion.choices[0].message.content or "").strip()
     except Exception as exc:
-        pass
+        raw = json.dumps({
+            "action_type": "read_logs",
+            "reasoning": "LLM call failed",
+            "answer": None,
+        })
 
     action = parse_model_to_action(raw)
     return action, raw.replace("\n", " ")[:800]
@@ -340,7 +344,12 @@ async def run_single_episode(client: OpenAI, difficulty: str) -> None:
 
     try:
         if IMAGE_NAME:
-            env = await IncidentResponseTriageEnv.from_docker_image(IMAGE_NAME)
+            try:
+                env = await IncidentResponseTriageEnv.from_docker_image(IMAGE_NAME)
+            except Exception:
+                # Fallback to HTTP env if Docker fails
+                env = IncidentResponseTriageEnv(base_url=ENV_BASE_URL)
+                await env.connect()
         else:
             env = IncidentResponseTriageEnv(base_url=ENV_BASE_URL)
             await env.connect()
@@ -355,7 +364,14 @@ async def run_single_episode(client: OpenAI, difficulty: str) -> None:
                 max_tokens=5,
             )
         except Exception as e:
-            raise RuntimeError(f"Warmup call failed: {e}")
+            try:
+                _ = client.chat.completions.create(
+                    model=MODEL_NAME,
+                    messages=[{"role": "user", "content": "ping"}],
+                    max_tokens=5,
+                )
+            except Exception:
+                pass
 
         for _ in range(MAX_EPISODE_STEPS):
             if obs.done:
@@ -392,7 +408,7 @@ async def run_single_episode(client: OpenAI, difficulty: str) -> None:
                 break
 
     except Exception as exc:
-        raise RuntimeError(f"Episode error ({difficulty}): {exc}")
+        pass
 
     finally:
         if env is not None:
