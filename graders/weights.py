@@ -253,4 +253,4 @@ def apply_adjustment_rules(
         return _SCORE_MIN
     if score >= _SCORE_MAX:
         return _SCORE_MAX
-    return round(score, 4)
+    return round(score, 4)

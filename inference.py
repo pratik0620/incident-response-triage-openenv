@@ -59,8 +59,6 @@ from incident_response_triage_env.models import IncidentResponseTriageAction  # 
 
 
 #==========Configuration (all overridable via environment variables)==========#
-API_KEY = os.environ.get("API_KEY", "")
-API_BASE_URL = os.environ.get("API_BASE_URL", "")
 MODEL_NAME = os.getenv("MODEL_NAME", "Qwen/Qwen2.5-7B-Instruct")
 IMAGE_NAME = os.getenv("IMAGE_NAME") or os.getenv("LOCAL_IMAGE_NAME")
 ENV_BASE_URL = os.getenv("ENV_BASE_URL", "http://localhost:8000")
@@ -88,61 +86,15 @@ def clamp_score(score: float) -> float:
         return _SCORE_MAX
     return round(val, 4)
 
-async def run_episode(difficulty: str) -> float:
-    env: Optional[IncidentResponseTriageEnv] = None
-    final_score: float = _SCORE_MIN
-
-    try:
-        env = IncidentResponseTriageEnv(base_url=ENV_BASE_URL)
-        await env.connect()
-
-        result = await env.reset(difficulty=difficulty)
-        obs = result.observation
-
-        client = OpenAI(
-            base_url=os.environ["API_BASE_URL"],
-            api_key=os.environ["API_KEY"]
-        )
-
-        for _ in range(MAX_EPISODE_STEPS):
-            if obs.done:
-                break
-
-            user_prompt = build_observation_prompt(obs)
-            action, _ = get_model_action(client, user_prompt)
-
-            result = await env.step(action)
-            obs = result.observation
-
-            if result.done:
-                fs = getattr(obs, "final_score", None)
-                if fs is not None:
-                    final_score = clamp_score(fs)
-                break
-
-    except Exception as e:
-        print(f"[ERROR] Episode failed: {e}")
-
-    finally:
-        if env:
-            try:
-                await env.close()
-            except:
-                pass
-
-    return clamp_score(final_score)
-
-
-def run_sync_episode(difficulty: str) -> float:
-    return asyncio.run(run_episode(difficulty))
+def get_openai_client() -> OpenAI:
+    """Initialize the OpenAI client using environment variables provided by the platform."""
+    return OpenAI(
+        base_url=os.environ["API_BASE_URL"],
+        api_key=os.environ["API_KEY"]
+    )
 
 
 # ── Grading Logic ────────────────────────────────────────────────────────────
-
-def _grading_logic(difficulty: str) -> float:
-    """Run a full episode for the given difficulty and return a clamped score."""
-    score = run_sync_episode(difficulty)
-    return clamp_score(score)
 
 
 VALID_ACTIONS = frozenset(
@@ -442,13 +394,7 @@ async def run_single_episode(client: OpenAI, difficulty: str) -> None:
 
 
 async def main() -> None:
-    if not os.environ.get("API_KEY"):
-        raise ValueError("API_KEY environment variable is required.")
-
-    client = OpenAI(
-        base_url=os.environ["API_BASE_URL"],
-        api_key=os.environ["API_KEY"]
-    )
+    client = get_openai_client()
 
     difficulties = ["easy", "medium", "hard"]
 
