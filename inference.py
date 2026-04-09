@@ -26,6 +26,12 @@ from typing import Any, List, Optional, Tuple
 
 from openai import OpenAI
 
+if not os.environ.get("API_BASE_URL"):
+    raise ValueError("Missing API_BASE_URL")
+
+if not os.environ.get("API_KEY"):
+    raise ValueError("Missing API_KEY")
+
 
 def _ensure_package_loaded() -> None:
     try:
@@ -315,11 +321,7 @@ def get_model_action(client: OpenAI, user_prompt: str) -> Tuple[IncidentResponse
         )
         raw = (completion.choices[0].message.content or "").strip()
     except Exception as exc:
-        raw = json.dumps({
-            "action_type": "read_logs",
-            "reasoning": f"LLM error: {exc}",
-            "answer": None,
-        })
+        pass
 
     action = parse_model_to_action(raw)
     return action, raw.replace("\n", " ")[:800]
@@ -345,6 +347,15 @@ async def run_single_episode(client: OpenAI, difficulty: str) -> None:
 
         result = await env.reset(difficulty=difficulty)
         obs = result.observation
+
+        try:
+            _ = client.chat.completions.create(
+                model=MODEL_NAME,
+                messages=[{"role": "user", "content": "ping"}],
+                max_tokens=5,
+            )
+        except Exception as e:
+            raise RuntimeError(f"Warmup call failed: {e}")
 
         for _ in range(MAX_EPISODE_STEPS):
             if obs.done:
@@ -381,7 +392,7 @@ async def run_single_episode(client: OpenAI, difficulty: str) -> None:
                 break
 
     except Exception as exc:
-        print(f"[DEBUG] Episode error ({difficulty}): {exc}", flush=True)
+        raise RuntimeError(f"Episode error ({difficulty}): {exc}")
 
     finally:
         if env is not None:
