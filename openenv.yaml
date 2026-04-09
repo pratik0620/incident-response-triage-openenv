@@ -2,20 +2,27 @@ spec_version: 1
 name: incident-response-triage
 version: "1.0.0"
 description: "Incident response triage environment"
+author: "Pratik Morkar, Nishant Ninawe, Surabhi Nikam"
 type: space
-runtime: fastapi
-app: inference:app
-port: 7860
+
+endpoints:
+  health: /health
+  reset:  /reset
+  step:   /step
+  state:  /state
+
 tasks:
   - id: task_easy
     description: "Easy incident triage task"
     difficulty: easy
-    grader: grade/task_easy
   - id: task_medium
     description: "Medium incident triage task"
     difficulty: medium
-    grader: grade/task_medium
   - id: task_hard
     description: "Hard incident triage task"
     difficulty: hard
-    grader: grade/task_hard
+
+scoring:
+  reward_range: [0.0, 1.0]
+  success_threshold: 0.5
+  score_formula: mean(step_rewards)
