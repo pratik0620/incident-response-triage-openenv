@@ -59,8 +59,8 @@ from incident_response_triage_env.models import IncidentResponseTriageAction  # 
 
 
 #==========Configuration (all overridable via environment variables)==========#
-API_KEY = os.environ["API_KEY"]
-API_BASE_URL = os.environ["API_BASE_URL"]
+API_KEY = os.environ.get("API_KEY", "")
+API_BASE_URL = os.environ.get("API_BASE_URL", "")
 MODEL_NAME = os.getenv("MODEL_NAME", "Qwen/Qwen2.5-7B-Instruct")
 IMAGE_NAME = os.getenv("IMAGE_NAME") or os.getenv("LOCAL_IMAGE_NAME")
 ENV_BASE_URL = os.getenv("ENV_BASE_URL", "http://localhost:8000")
@@ -99,7 +99,10 @@ async def run_episode(difficulty: str) -> float:
         result = await env.reset(difficulty=difficulty)
         obs = result.observation
 
-        client = OpenAI(base_url=API_BASE_URL, api_key=API_KEY)
+        client = OpenAI(
+            base_url=os.environ["API_BASE_URL"],
+            api_key=os.environ["API_KEY"]
+        )
 
         for _ in range(MAX_EPISODE_STEPS):
             if obs.done:
@@ -439,10 +442,13 @@ async def run_single_episode(client: OpenAI, difficulty: str) -> None:
 
 
 async def main() -> None:
-    if not API_KEY:
-        raise ValueError("HF_TOKEN (or OPENAI_API_KEY) environment variable is required.")
+    if not os.environ.get("API_KEY"):
+        raise ValueError("API_KEY environment variable is required.")
 
-    client = OpenAI(base_url=API_BASE_URL, api_key=API_KEY or "")
+    client = OpenAI(
+        base_url=os.environ["API_BASE_URL"],
+        api_key=os.environ["API_KEY"]
+    )
 
     difficulties = ["easy", "medium", "hard"]
 
