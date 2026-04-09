@@ -88,7 +88,7 @@ class IncidentResponseTriageEnvironment(Environment):
             done=False,
         )
 
-        return self._build_observation(reward=0.01, done=False)
+        return self._build_observation(reward=0.0001, done=False)
 
 
     def step(self, action: IncidentResponseTriageAction) -> IncidentResponseTriageObservation:  # type: ignore[override]
@@ -97,7 +97,7 @@ class IncidentResponseTriageEnvironment(Environment):
 
         if self._state.done:
             return self._build_observation(
-                reward=self._normalize_score(self._state.final_score or 0.01),
+                reward=self._normalize_score(self._state.final_score or 0.0001),
                 done=True,
                 msg="Episode ended.",
                 final_score=self._normalize_score(self._state.final_score or 0.01),
@@ -111,7 +111,7 @@ class IncidentResponseTriageEnvironment(Environment):
         if action_type in ["identify_cause", "propose_fix", "escalate"]:
             return self._handle_terminal(action_type, action)
 
-        reward = 0.01
+        reward = 0.0001
 
         if self._state.step >= self._state.max_steps:
             return self._force_end()

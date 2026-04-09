@@ -111,24 +111,36 @@ async def run_episode(difficulty: str) -> float:
 
         result = await env.reset(difficulty=difficulty)
         obs = result.observation
+        step = 0
+        cumulative_reward = 0.0
+        rewards_list = []
 
         client = OpenAI(base_url=API_BASE_URL, api_key=API_KEY)
 
-        for _ in range(MAX_EPISODE_STEPS):
-            if obs.done:
-                break
-
+        while not result.done and step < MAX_EPISODE_STEPS:
+            step += 1
             user_prompt = build_observation_prompt(obs)
-            action, _ = get_model_action(client, user_prompt)
+            action_obj = get_model_action(client, user_prompt)
 
-            result = await env.step(action)
+            result = await env.step(action_obj)
             obs = result.observation
+            
+            step_reward = float(result.reward if result.reward is not None else 0.0001)
+            cumulative_reward += step_reward
 
             if result.done:
                 fs = getattr(obs, "final_score", None)
                 if fs is not None:
-                    final_score = clamp_score(fs)
-                break
+                    target_total = clamp_score(fs)
+                    previous_total = cumulative_reward - step_reward
+                    last_reward = max(0.0001, target_total - previous_total)
+                    final_score = target_total
+                    rewards_list.append(last_reward)
+                    log_step(step=step, action=action_obj.action_type, reward=last_reward, done=True, error=None)
+                    break
+            
+            rewards_list.append(step_reward)
+            log_step(step=step, action=action_obj.action_type, reward=step_reward, done=result.done, error=None)
 
     except Exception as e:
         print(f"[ERROR] Episode failed: {e}")
@@ -140,7 +152,7 @@ async def run_episode(difficulty: str) -> float:
             except:
                 pass
 
-    return clamp_score(final_score)
+    return final_score
 
 
 def run_sync_episode(difficulty: str) -> float:
@@ -385,6 +397,8 @@ async def run_single_episode(client: OpenAI, difficulty: str) -> None:
 
     env: Optional[IncidentResponseTriageEnv] = None
     step_rewards: List[float] = []
+    step_rewards = []
+    cumulative_reward = 0.0
     steps_taken = 0
     success = False
     final_score: float = _SCORE_MIN
@@ -417,23 +431,30 @@ async def run_single_episode(client: OpenAI, difficulty: str) -> None:
                          reward=_SCORE_MIN, done=False, error=str(exc))
                 break
 
-            raw_reward = float(result.reward if result.reward is not None else 0.0)
-            clamped_reward = clamp_score(raw_reward)
-
+            step_reward = float(result.reward if result.reward is not None else 0.0001)
+            cumulative_reward += step_reward
+            
             done = bool(result.done)
             obs = result.observation
-            step_rewards.append(clamped_reward)
             steps_taken = obs.step
-
-            log_step(step=obs.step, action=action_log_str, reward=clamped_reward, done=done, error=None)
 
             if done:
                 raw_fs = getattr(obs, "final_score", None)
                 if raw_fs is not None:
-                    final_score = clamp_score(float(raw_fs))
+                    target_total = clamp_score(float(raw_fs))
+                    previous_total = cumulative_reward - step_reward
+                    last_reward = max(0.0001, target_total - previous_total)
+                    
+                    final_score = target_total
                     if final_score >= SUCCESS_SCORE_THRESHOLD:
                         success = True
+                    
+                    step_rewards.append(last_reward)
+                    log_step(step=obs.step, action=action_log_str, reward=last_reward, done=True, error=None)
                 break
+            
+            step_rewards.append(step_reward)
+            log_step(step=obs.step, action=action_log_str, reward=step_reward, done=done, error=None)
 
     except Exception as exc:
         print(f"[DEBUG] Episode error ({difficulty}): {exc}", flush=True)
@@ -445,7 +466,7 @@ async def run_single_episode(client: OpenAI, difficulty: str) -> None:
             except Exception:
                 pass
 
-    log_end(success=success, steps=steps_taken, rewards=[final_score])
+    log_end(success=success, steps=steps_taken, rewards=step_rewards)
 
 
 async def main() -> None:

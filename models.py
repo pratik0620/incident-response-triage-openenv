@@ -39,7 +39,7 @@ class IncidentResponseTriageObservation(Observation):
     alerts: list[Alert]
     previous_actions: list[str] = Field(default_factory=list)
     task_description: str
-    reward: float = 0.01
+    reward: float = 0.0001
     done: bool = False
     final_score : Optional[float] = None
 
