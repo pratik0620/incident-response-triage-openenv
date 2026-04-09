@@ -4,7 +4,7 @@ Inference Script — incident_response_triage_env
 STDOUT FORMAT (mandatory):
     [START] task=<task_name> env=<benchmark> model=<model_name>
     [STEP]  step=<n> action=<action_str> reward=<0.00> done=<true|false> error=<msg|null>
-    [END]   success=<true|false> steps=<n> rewards=<r1,r2,...,rn>
+    [END]   success=<true|false> steps=<n> score=<score> rewards=<r1,r2,...,rn>
 
 ENV VARS:
     API_BASE_URL       LLM endpoint  (default: HuggingFace router)
@@ -26,11 +26,9 @@ from typing import Any, List, Optional, Tuple
 
 from openai import OpenAI
 
-if not os.environ.get("API_BASE_URL"):
-    raise ValueError("Missing API_BASE_URL")
-
-if not os.environ.get("API_KEY"):
-    raise ValueError("Missing API_KEY")
+API_BASE_URL = os.getenv("API_BASE_URL") or "https://router.huggingface.co/v1"
+API_KEY = os.getenv("HF_TOKEN") or os.getenv("API_KEY")
+MODEL_NAME = os.getenv("MODEL_NAME") or "Qwen/Qwen2.5-72B-Instruct"
 
 
 def _ensure_package_loaded() -> None:
@@ -69,7 +67,7 @@ MODEL_NAME = os.getenv("MODEL_NAME", "Qwen/Qwen2.5-7B-Instruct")
 IMAGE_NAME = os.getenv("IMAGE_NAME") or os.getenv("LOCAL_IMAGE_NAME")
 ENV_BASE_URL = os.getenv("ENV_BASE_URL", "http://localhost:8000")
 
-TASK_NAME = os.getenv("INCIDENT_TRIAGE_TASK", "incident-triage")
+TASK_NAME = os.getenv("INCIDENT_TRIAGE_TASK", "incident_response_triage")
 BENCHMARK = os.getenv("INCIDENT_TRIAGE_BENCHMARK", "incident_response_triage_env")
 DIFFICULTY = os.getenv("INCIDENT_TRIAGE_DIFFICULTY", "easy")
 
@@ -95,8 +93,8 @@ def clamp_score(score: float) -> float:
 def get_openai_client() -> OpenAI:
     """Initialize the OpenAI client using environment variables provided by the platform."""
     return OpenAI(
-        base_url=os.environ["API_BASE_URL"],
-        api_key=os.environ["API_KEY"]
+        base_url=API_BASE_URL,
+        api_key=API_KEY
     )
 
 
@@ -321,9 +319,10 @@ def get_model_action(client: OpenAI, user_prompt: str) -> Tuple[IncidentResponse
         )
         raw = (completion.choices[0].message.content or "").strip()
     except Exception as exc:
+        print(f"[DEBUG] Model request failed: {exc}", flush=True)
         raw = json.dumps({
             "action_type": "read_logs",
-            "reasoning": "LLM call failed",
+            "reasoning": "LLM call failed, defaulting to read_logs",
             "answer": None,
         })
 
@@ -408,14 +407,14 @@ async def run_single_episode(client: OpenAI, difficulty: str) -> None:
                 break
 
     except Exception as exc:
-        pass
+        print(f"[DEBUG] Episode failed: {exc}", flush=True)
 
     finally:
         if env is not None:
             try:
                 await env.close()
-            except Exception:
-                pass
+            except Exception as e:
+                print(f"[DEBUG] env.close() error: {e}", flush=True)
 
     log_end(difficulty=difficulty, final_score=final_score, steps_taken=steps_taken)
 
