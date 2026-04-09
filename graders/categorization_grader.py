@@ -19,7 +19,7 @@ Upgrade from v1:
     - Category matching still accepts underscore and spaced forms.
     - "flaky"/"intermittent" are treated as aliases.
     - Root-cause matching now uses synonym expansion (same as root_cause_grader).
-    - Scores still in [0.0, 1.0], fully deterministic.
+    - Scores strictly in (0.0, 1.0), fully deterministic.
 """
 
 from __future__ import annotations
@@ -32,6 +32,20 @@ if TYPE_CHECKING:
 
 VALID_CATEGORIES = {"real", "flaky", "intermittent", "env_specific"}
 
+# Hard bounds — platform requires strictly open interval (0, 1).
+_SCORE_MIN = 0.01
+_SCORE_MAX = 0.99
+
+
+def _clamp(score: float) -> float:
+    """Enforce strictly open (0, 1) on categorization score."""
+    val = float(score)
+    if val <= _SCORE_MIN:
+        return _SCORE_MIN
+    if val >= _SCORE_MAX:
+        return _SCORE_MAX
+    return round(val, 4)
+
 
 def grade_categorization(answer: str, ground_truth: "GroundTruth") -> float:
     """
@@ -42,10 +56,10 @@ def grade_categorization(answer: str, ground_truth: "GroundTruth") -> float:
         ground_truth: A GroundTruth instance. Must have failure_category set.
 
     Returns:
-        float in [0.0, 1.0] — higher is better.
+        float strictly in (0.0, 1.0) — higher is better.
     """
     if not answer or not answer.strip():
-        return 0.01
+        return _clamp(0.0)
 
     answer_lower = answer.lower()
     score = 0.0
@@ -82,4 +96,4 @@ def grade_categorization(answer: str, ground_truth: "GroundTruth") -> float:
     elif word_hits == 1:
         score += 0.08
 
-    return round(min(score, 1.0), 4)
+    return _clamp(score)

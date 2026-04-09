@@ -191,6 +191,10 @@ _FIX_REASONING_PENALTY = 0.15
 _NOISE_LOW_THRESHOLD = 0.3
 _NOISE_LOW_PENALTY = 0.10
 
+# Hard bounds — platform requires strictly open interval (0, 1).
+_SCORE_MIN = 0.01
+_SCORE_MAX = 0.99
+
 
 def apply_adjustment_rules(
     base_score: float,
@@ -227,7 +231,7 @@ def apply_adjustment_rules(
         difficulty:  "easy", "medium", or "hard".
 
     Returns:
-        Adjusted score, clamped to [0.0, 1.0].
+        Adjusted score, clamped to (0.0, 1.0).
     """
     score = base_score
 
@@ -245,4 +249,8 @@ def apply_adjustment_rules(
     if noise < _NOISE_LOW_THRESHOLD:
         score -= _NOISE_LOW_PENALTY
 
-    return round(max(0.0, min(score, 1.0)), 4)
+    if score <= _SCORE_MIN:
+        return _SCORE_MIN
+    if score >= _SCORE_MAX:
+        return _SCORE_MAX
+    return round(score, 4)

@@ -86,7 +86,12 @@ _SCORE_MAX = 0.99
 
 def clamp_score(score: float) -> float:
     """Clamp a score to the open interval (0, 1) as required by the platform."""
-    return max(_SCORE_MIN, min(_SCORE_MAX, float(score)))
+    val = float(score)
+    if val <= _SCORE_MIN:
+        return _SCORE_MIN
+    if val >= _SCORE_MAX:
+        return _SCORE_MAX
+    return round(val, 4)
 
 app = FastAPI()
 

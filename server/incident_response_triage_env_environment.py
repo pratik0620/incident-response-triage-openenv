@@ -49,7 +49,13 @@ class IncidentResponseTriageEnvironment(Environment):
         if score is None:
             return 0.01
 
-        rounded = round(float(score), 4)
+        val = float(score)
+        if val <= 0.0:
+            return 0.01
+        if val >= 1.0:
+            return 0.99
+        
+        rounded = round(val, 4)
         if rounded <= 0.0:
             return 0.01
         if rounded >= 1.0:

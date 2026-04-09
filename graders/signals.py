@@ -40,7 +40,12 @@ _SIG_MAX = 0.99
 
 def _clamp(score: float) -> float:
     """Enforce strictly open (0, 1) on any signal score."""
-    return round(max(_SIG_MIN, min(float(score), _SIG_MAX)), 4)
+    val = float(score)
+    if val <= _SIG_MIN:
+        return _SIG_MIN
+    if val >= _SIG_MAX:
+        return _SIG_MAX
+    return round(val, 4)
 
 
 # ─────────────────────────────────────────────────────────────────────────────

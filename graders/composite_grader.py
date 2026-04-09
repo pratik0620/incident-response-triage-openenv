@@ -71,8 +71,12 @@ def _safe_score(score: float) -> float:
     """
     Clamp score to strictly (0, 1) — i.e. [0.01, 0.99].
     """
-    clamped = max(_SCORE_MIN, min(float(score), _SCORE_MAX))
-    return round(clamped, 4)
+    val = float(score)
+    if val <= _SCORE_MIN:
+        return _SCORE_MIN
+    if val >= _SCORE_MAX:
+        return _SCORE_MAX
+    return round(val, 4)
 
 def compute_final_score(
     action_type: str,
