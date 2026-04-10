@@ -64,7 +64,7 @@ from incident_response_triage_env.models import IncidentResponseTriageAction  # 
 
 #==========Configuration (all overridable via environment variables)==========#
 IMAGE_NAME = os.getenv("IMAGE_NAME") or os.getenv("LOCAL_IMAGE_NAME")
-ENV_BASE_URL = os.getenv("ENV_BASE_URL", "http://localhost:8000")
+ENV_BASE_URL = os.getenv("ENV_BASE_URL", "https://pratik234567-incident-response-triage-env.hf.space")
 
 TASK_NAME = os.getenv("INCIDENT_TRIAGE_TASK", "incident_response_triage")
 BENCHMARK = os.getenv("INCIDENT_TRIAGE_BENCHMARK", "incident_response_triage_env")
