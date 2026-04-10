@@ -26,9 +26,9 @@ from typing import Any, List, Optional, Tuple
 
 from openai import OpenAI
 
-API_BASE_URL = os.getenv("API_BASE_URL") or "https://router.huggingface.co/v1"
-API_KEY = os.getenv("HF_TOKEN") or os.getenv("API_KEY")
-MODEL_NAME = os.getenv("MODEL_NAME") or "Qwen/Qwen2.5-72B-Instruct"
+API_BASE_URL = os.environ["API_BASE_URL"]
+API_KEY = os.environ["API_KEY"]
+MODEL_NAME = os.getenv("MODEL_NAME", "Qwen/Qwen2.5-72B-Instruct")
 
 
 def _ensure_package_loaded() -> None:
@@ -63,7 +63,6 @@ from incident_response_triage_env.models import IncidentResponseTriageAction  # 
 
 
 #==========Configuration (all overridable via environment variables)==========#
-MODEL_NAME = os.getenv("MODEL_NAME", "Qwen/Qwen2.5-7B-Instruct")
 IMAGE_NAME = os.getenv("IMAGE_NAME") or os.getenv("LOCAL_IMAGE_NAME")
 ENV_BASE_URL = os.getenv("ENV_BASE_URL", "http://localhost:8000")
 
@@ -355,22 +354,6 @@ async def run_single_episode(client: OpenAI, difficulty: str) -> None:
 
         result = await env.reset(difficulty=difficulty)
         obs = result.observation
-
-        try:
-            _ = client.chat.completions.create(
-                model=MODEL_NAME,
-                messages=[{"role": "user", "content": "ping"}],
-                max_tokens=5,
-            )
-        except Exception as e:
-            try:
-                _ = client.chat.completions.create(
-                    model=MODEL_NAME,
-                    messages=[{"role": "user", "content": "ping"}],
-                    max_tokens=5,
-                )
-            except Exception:
-                pass
 
         for _ in range(MAX_EPISODE_STEPS):
             if obs.done:
